@@ -1,2 +1,6 @@
 streamlit==1.31.1
 selenium
+pandas
+requests
+matplotlib
+pillow
