@@ -237,29 +237,67 @@ def main():
     df_cleaned["Hosté"] = df_cleaned["Hosté"].apply(clean_percentage)
 
     # -----------------------------------------------------------------------------
-    # 3) Pro ukázku přidáme i sestavy (domácí_df a hosté_df)
-    #    Tady jen uděláme "mock" data, aby se to zobrazilo.
+    # 3) Stažení sestav (domácí a hosté) z /lineups
     # -----------------------------------------------------------------------------
-    # V reálném kódu byste sem vložili kód pro extrakci z /lineups
-    # Zde jen dummy data s ratingy:
-    home_data = {
-        "Hráč": ["Novák", "Krejčí", "Moravec"],
-        "Č.": [1, 10, 9],
-        "Pozice": ["Br", "Zál", "Ú"],
-        "Známka": [7.2, 6.1, 8.0],
-        "Minuty": [90, 88, 90],
-    }
-    away_data = {
-        "Hráč": ["Kolář", "Coufal", "Tecl"],
-        "Č.": [1, 5, 11],
-        "Pozice": ["Br", "Obr", "Ú"],
-        "Známka": [6.9, 7.5, 5.9],
-        "Minuty": [90, 90, 72],
-    }
 
-    home_df = pd.DataFrame(home_data)
-    away_df = pd.DataFrame(away_data)
+    url_lineups = f"https://www.sofascore.com/api/v1/event/{match_id}/lineups"
+    driver = webdriver.Chrome(options=chrome_options)
+    try:
+        driver.get(url_lineups)
+        pre_element = driver.find_element(By.TAG_NAME, 'pre')
+        json_lineups = json.loads(pre_element.text)
 
+        # Funkce pro extrakci hráčů
+        def extract_players(data, team_type):
+            players = data[team_type]['players']
+            extracted_data = []
+            for player_data in players:
+                player = player_data['player']
+                statistics = player_data.get('statistics', {})
+                extracted_data.append({
+                    'Hráč': player.get('shortName'),
+                    'Č.': player.get('jerseyNumber'),
+                    'Pozice': player_data.get('position'),   # G, D, M, F
+                    'Známka': statistics.get('rating'),
+                    'Minuty': statistics.get('minutesPlayed'),
+                        })
+                return extracted_data
+
+    # Extrakce domácích a hostů
+        home_players = extract_players(json_lineups, 'home')
+        away_players = extract_players(json_lineups, 'away')
+
+        home_df = pd.DataFrame(home_players)
+        away_df = pd.DataFrame(away_players)
+
+    finally:
+        driver.quit()
+
+# -----------------------------------------------------------------------------
+# 4) Vyčištění a úprava tabulek
+# -----------------------------------------------------------------------------
+# Převod pozic z písmen na české názvy
+    position_names = {'G': 'Br', 'D': 'Obr', 'M': 'Zál', 'F': 'Ú'}
+    home_df['Pozice'] = home_df['Pozice'].map(position_names)
+    away_df['Pozice'] = away_df['Pozice'].map(position_names)
+
+# Odstranit hráče, kteří nemají rating (např. náhradníci, co nenastoupili)
+    home_df = home_df.dropna(subset=['Známka'])
+    away_df = away_df.dropna(subset=['Známka'])
+
+# Převedení minut na integer
+    home_df['Minuty'] = home_df['Minuty'].astype(int)
+    away_df['Minuty'] = away_df['Minuty'].astype(int)
+
+# Seřazení hráčů (např. podle pozice a ratingu)
+    position_order = {'Br': 1, 'Obr': 2, 'Zál': 3, 'Ú': 4}
+    home_df['PositionOrder'] = home_df['Pozice'].map(position_order)
+    away_df['PositionOrder'] = away_df['Pozice'].map(position_order)
+
+    home_df = home_df.sort_values(by=['PositionOrder', 'Známka'],
+                              ascending=[True, False]).drop(columns='PositionOrder')
+    away_df = away_df.sort_values(by=['PositionOrder', 'Známka'],
+                              ascending=[True, False]).drop(columns='PositionOrder')
     # -----------------------------------------------------------------------------
     # 4) Nakreslení obrázku s tabulkami a momentum grafem
     # -----------------------------------------------------------------------------
