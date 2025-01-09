@@ -114,18 +114,46 @@ def clean_percentage(value):
 
 def extract_metrics_from_json(json_data, metrics):
     """
-    Projde JSON se statistikami a vytáhne jen požadované metriky (metrics).
-    Vrací dict, který následně převedeme do DataFrame.
+    Projde JSON se statistikami a vytáhne jen požadované metriky.
+    Funkce vrací přímo DataFrame se sloupci:
+      - "Metoda" (původní název metriky, např. "Total shots")
+      - "Domácí"
+      - "Hosté"
+
+    Pokud statistiky neexistují nebo jsou prázdné, vrátí prázdný DataFrame.
     """
-    extracted_data = {}
-    for group in json_data['statistics'][0]['groups']:
-        for item in group['statisticsItems']:
-            if item['name'] in metrics:
-                extracted_data[item['name']] = {
-                    'home': item['home'],
-                    'away': item['away']
+
+    # Vytvoříme si prázdný DF pro případ, že data nenajdeme
+    df_empty = pd.DataFrame(columns=["Sloupec", "Domácí", "Hosté"])
+
+    # Ověříme, zda JSON obsahuje pole 'statistics' a potřebnou strukturu
+    if "statistics" not in json_data:
+        return df_empty
+    if not json_data["statistics"]:
+        return df_empty
+    if "groups" not in json_data["statistics"][0]:
+        return df_empty
+
+    data_rows = []
+    # Projdeme groupy a items:
+    for group in json_data["statistics"][0]["groups"]:
+        for item in group["statisticsItems"]:
+            # Zajímáme se jen o ty item['name'], které máme v 'metrics'
+            if item["name"] in metrics:
+                row = {
+                    "Metoda": item["name"],
+                    "Domácí": item["home"],
+                    "Hosté": item["away"]
                 }
-    return extracted_data
+                data_rows.append(row)
+
+    # Pokud nic nenajdeme, vrátíme prázdný DF
+    if not data_rows:
+        return df_empty
+
+    # V opačném případě vytvoříme z data_rows DataFrame
+    df = pd.DataFrame(data_rows, columns=["Sloupec", "Domácí", "Hosté"])
+    return df
 
 def extract_players(data, team_type):
     players = data[team_type]['players']
