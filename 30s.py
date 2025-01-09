@@ -182,7 +182,12 @@ def main():
         graph_points = data.get("graphPoints", [])
         momentum = pd.DataFrame(graph_points)
         # Odstraníme pauzy
-        momentum = momentum[~momentum['minute'].isin([45.5, 90.5])]
+        if not graph_points:
+            st.warning("K dispozici nejsou žádná data pro graf momentum.")
+        else:
+            momentum = pd.DataFrame(graph_points)
+        # Odstraníme pauzy
+            momentum = momentum[~momentum['minute'].isin([45.5, 90.5])]
     finally:
         driver.quit()
 
