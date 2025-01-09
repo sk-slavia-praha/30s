@@ -451,8 +451,8 @@ def main():
 
     # A) Titulek (score je v datech "graphPoints"? Tady to uděláme napevno):
     #    Předpokládejme např. 2:1
-    homeScore = 2
-    awayScore = 1
+   
+    
     plt.text(
         0.52, 0.92,
         f"{home_team} x {away_team} {homeScore}-{awayScore}",
