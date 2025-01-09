@@ -146,7 +146,7 @@ def extract_players(data, team_type):
 # -----------------------------------------------------------------------------
 def main():
     # Nastavení auto-refresh každých 60 sekund
-    count = st_autorefresh(interval=2000, limit=None, key="fizzbuzzcounter")
+    count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
 
     st.write(f"Stránka se znovu načetla: {count}×")
     st.title("Ukázka SofaScore zápasu se Seleniem a grafikou")
