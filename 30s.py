@@ -436,7 +436,7 @@ def main():
     away_df = away_df.sort_values(by=['PositionOrder', 'Známka'],
                               ascending=[True, False]).drop(columns='PositionOrder')
     # -----------------------------------------------------------------------------
-    # 4) Nakreslení obrázku s tabulkami a momentum grafem
+    # 5) Nakreslení obrázku s tabulkami a momentum grafem
     # -----------------------------------------------------------------------------
     # Načteme loga
     try:
@@ -468,13 +468,13 @@ def main():
     )
     # Popisky týmů nad tabulkami
     plt.text(
-        0.395, 0.61,
+        0.395, 0.60,
         f"{home_team}",
         fontproperties=fp_pop, fontsize=12, ha='left',
         transform=fig.transFigure
     )
     plt.text(
-        0.63, 0.61,
+        0.63, 0.59,
         f"{away_team}",
         fontproperties=fp_pop, fontsize=12, ha='right',
         transform=fig.transFigure
@@ -645,7 +645,7 @@ def main():
             for spine in ax.spines.values():
                 spine.set_visible(False)
     # -----------------------------------------------------------------------------
-    # 5) Zobrazení výsledného obrázku ve Streamlitu
+    # 6) Zobrazení výsledného obrázku ve Streamlitu
     # -----------------------------------------------------------------------------
     st.pyplot(fig)
 
