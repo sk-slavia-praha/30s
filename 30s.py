@@ -490,7 +490,7 @@ def main():
         ax_top.axhline(y=0, color='gray', linestyle='-', linewidth=1, alpha=0.8, zorder=1)
         ax_top.bar(momentum['minute'], momentum['value'], color=colors, alpha=0.65, edgecolor='black')
     else:
-        st.warning("Data pro momentum nejsou k dispozici, graf se nevykreslil.")
+        st.write("")
     
 
 
