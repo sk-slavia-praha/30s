@@ -312,29 +312,29 @@ def main():
     # Extrakce metrik
     extracted_metrics = extract_metrics_from_json(json_data, required_metrics)
     st.write(extracted_metrics)
-    df = extracted_metrics.copy()
+    df.set_index("Sloupec", inplace=True)
 
-    df = pd.DataFrame.from_dict(extracted_metrics, orient='index')
-    df.columns = ['Domácí', 'Hosté']
-    df = df.reindex(required_metrics)  # Seřadit podle `required_metrics`
+    # Seřadíme řádky podle pořadí v required_metrics
+    df = df.reindex(required_metrics)
+
+    # Přejmenujeme index, pokud chceme místo "Sloupec" prázdný název:
     df.index.name = ''
+
+    # Pokud si ho chceme "vrátit zpátky" mezi sloupce:
     df.reset_index(inplace=True)
 
-    # Vytahování procent z "Ground duels" a "Aerial duels"
+    # Teď můžeme dělat další úpravy, např. extrakci procent pro "Ground duels"
     for col in ["Domácí", "Hosté"]:
         df.loc[df[""] == "Ground duels", col] = (
             df.loc[df[""] == "Ground duels", col]
               .astype(str)
               .str.extract(r'\((\d+%)\)')
-              [0]
-        )
+              [0])
         df.loc[df[""] == "Aerial duels", col] = (
             df.loc[df[""] == "Aerial duels", col]
               .astype(str)
               .str.extract(r'\((\d+%)\)')
-              [0]
-        )
-
+              [0])
     # Překlad sloupců
     translations = {
         "Total shots": "Střely",
