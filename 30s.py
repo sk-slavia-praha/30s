@@ -125,7 +125,7 @@ def extract_metrics_from_json(json_data, metrics):
     """
 
     # Vytvoříme si prázdný DF pro případ, že data nenajdeme
-    df_empty = pd.DataFrame(columns=["Domácí", "Hosté"])
+    df_empty = pd.DataFrame(columns=["Sloupec","Domácí", "Hosté"])
 
     # Ověříme, zda JSON obsahuje pole 'statistics' a potřebnou strukturu
     if "statistics" not in json_data:
@@ -142,7 +142,7 @@ def extract_metrics_from_json(json_data, metrics):
             # Zajímáme se jen o ty item['name'], které máme v 'metrics'
             if item["name"] in metrics:
                 row = {
-                    "Metoda": item["name"],
+                    "Sloupec": item["name"],
                     "Domácí": item["home"],
                     "Hosté": item["away"]
                 }
@@ -153,7 +153,7 @@ def extract_metrics_from_json(json_data, metrics):
         return df_empty
 
     # V opačném případě vytvoříme z data_rows DataFrame
-    df = pd.DataFrame(data_rows, columns=[ "Domácí", "Hosté"])
+    df = pd.DataFrame(data_rows, columns=["Sloupec", "Domácí", "Hosté"])
     st.write(df)
     return df
 
