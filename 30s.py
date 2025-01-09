@@ -312,6 +312,7 @@ def main():
     # Extrakce metrik
     extracted_metrics = extract_metrics_from_json(json_data, required_metrics)
     st.write(extracted_metrics)
+    df = extracted_metrics
     df.set_index("Sloupec", inplace=True)
 
     # Seřadíme řádky podle pořadí v required_metrics
