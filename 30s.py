@@ -313,10 +313,6 @@ def main():
 # -----------------------------------------------------------------------------
 # 4) Vyčištění a úprava tabulek
 # -----------------------------------------------------------------------------
-# Převod pozic z písmen na české názvy
-    position_names = {'G': 'Br', 'D': 'Obr', 'M': 'Zál', 'F': 'Ú'}
-    home_df['Pozice'] = home_df['Pozice'].map(position_names)
-    away_df['Pozice'] = away_df['Pozice'].map(position_names)
 
 # Odstranit hráče, kteří nemají rating (např. náhradníci, co nenastoupili)
     home_df = home_df.dropna(subset=['Známka'])
@@ -518,7 +514,11 @@ def main():
         cell.set_text_props(ha='center', fontproperties=fp_pop2)
 
     plt.subplots_adjust(wspace=0.5, hspace=0.25)
-
+    for ax in fig.get_axes():
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+                spine.set_visible(False)
     # -----------------------------------------------------------------------------
     # 5) Zobrazení výsledného obrázku ve Streamlitu
     # -----------------------------------------------------------------------------
