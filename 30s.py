@@ -10,6 +10,7 @@ from PIL import Image
 from io import BytesIO
 from collections import Counter
 import numpy as np
+from streamlit_autorefresh import st_autorefresh
 
 # -- Selenium
 from selenium import webdriver
