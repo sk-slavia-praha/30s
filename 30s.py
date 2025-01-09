@@ -468,7 +468,7 @@ def main():
     )
     # Popisky týmů nad tabulkami
     plt.text(
-        0.395, 0.62,
+        0.395, 0.63,
         f"{home_team}",
         fontproperties=fp_pop, fontsize=12, ha='left',
         transform=fig.transFigure
