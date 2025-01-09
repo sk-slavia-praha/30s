@@ -152,16 +152,16 @@ def main():
     st.title("Ukázka SofaScore zápasu se Seleniem a grafikou")
 
     # Ukázkové vstupy
-    home_team = "Teplice"
+    home_team = "Chennaiyin"
     home_color = "blue"
-    home_logo_url = "https://img.sofascore.com/api/v1/team/2208/image"
+    home_logo_url = "https://img.sofascore.com/api/v1/team/174590/image"
 
-    away_team = "Slavia Praha"
+    away_team = "Odisha"
     away_color = "red"
-    away_logo_url = "https://img.sofascore.com/api/v1/team/2216/image"
+    away_logo_url = "https://img.sofascore.com/api/v1/team/174592/image"
 
-    datum = "15.12.2024"
-    match_id = 12580722
+    datum = "09.01.2025"
+    match_id = 13077964
 
     # Volitelně: umožnit uživateli zadat si i jiná data
     # match_id = st.number_input("Zadej match_id", value=12580722)
