@@ -144,6 +144,9 @@ def extract_players(data, team_type):
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
 def main():
+    # Nastavení auto-refresh každých 60 sekund
+    count = st.autorefresh(interval=60_000, limit=None, key="refresh_app")
+    st.write(f"Stránka se znovu načetla: {count}×")
     st.title("Ukázka SofaScore zápasu se Seleniem a grafikou")
 
     # Ukázkové vstupy
@@ -308,8 +311,6 @@ def main():
 
     finally:
         driver.quit()
-    st.write(home_df)
-    st.write(away_df)
 # -----------------------------------------------------------------------------
 # 4) Vyčištění a úprava tabulek
 # -----------------------------------------------------------------------------
