@@ -468,121 +468,126 @@ def main():
     ax_top.spines['left'].set_visible(False)
 
     # C) Levá tabulka = Domácí
-    ax_left = fig.add_subplot(gs[1:, 0])
-    ax_left.axis('tight')
-    ax_left.axis('off')
-    table_left = ax_left.table(
-        cellText=home_df.values,
-        colLabels=home_df.columns,
-        loc='upper center'
-    )
-    table_left.auto_set_font_size(False)
-    table_left.set_fontsize(12)
-    table_left.scale(1.2, 1.6)
+    if not home_df.empty:
+        ax_left = fig.add_subplot(gs[1:, 0])
+        ax_left.axis('tight')
+        ax_left.axis('off')
+        table_left = ax_left.table(
+            cellText=home_df.values,
+            colLabels=home_df.columns,
+            loc='upper center')
+        table_left.auto_set_font_size(False)
+        table_left.set_fontsize(12)
+        table_left.scale(1.2, 1.6)
 
-    # Podbarvování řádků podle ratingu (4. sloupec = index 3)
-    rating_col_index = 3
-    for (row, col), cell in table_left.get_celld().items():
-        if row > 0:  # vynechat header (row=0)
-            rating = float(home_df.iloc[row - 1, rating_col_index])
-            base_color = get_rating_color(rating)
-            rgba_color = to_rgba(base_color, alpha=0.5)
-            cell.set_facecolor(rgba_color)
-        else:
+        # Podbarvování řádků podle ratingu (4. sloupec = index 3)
+        rating_col_index = 3
+        for (row, col), cell in table_left.get_celld().items():
+            if row > 0:  # vynechat header (row=0)
+                rating = float(home_df.iloc[row - 1, rating_col_index])
+                base_color = get_rating_color(rating)
+                rgba_color = to_rgba(base_color, alpha=0.5)
+                cell.set_facecolor(rgba_color)
+            else:
             # záhlaví tabulky
-            cell.set_facecolor(to_rgba('lightgrey', alpha=1.0))
+                cell.set_facecolor(to_rgba('lightgrey', alpha=1.0))
 
-        # Šířka sloupců
-        if col == 0:
-            cell.set_width(0.45)
-        elif col == 1:
-            cell.set_width(0.1)
-        elif col == 2:
-            cell.set_width(0.15)
-        else:
-            cell.set_width(0.2)
-        cell.set_text_props(ha='center', fontproperties=fp_pop2)
+            # Šířka sloupců
+            if col == 0:
+                cell.set_width(0.45)
+            elif col == 1:
+                cell.set_width(0.1)
+            elif col == 2:
+                cell.set_width(0.15)
+            else:
+                cell.set_width(0.2)
+            cell.set_text_props(ha='center', fontproperties=fp_pop2)
+    else:
+        st.warning("Tabulka domácích je prázdná – nic nevykresluji.")
 
-    # D) Prostřední tabulka = Statistiky
-    ax_middle = fig.add_subplot(gs[1:, 1])
-    ax_middle.axis('tight')
-    ax_middle.axis('off')
-    table_middle = ax_middle.table(
-        cellText=df.values,
-        colLabels=df.columns,
-        loc='upper center'
-    )
-    table_middle.auto_set_font_size(False)
-    table_middle.set_fontsize(12)
-    table_middle.scale(1.2, 1.6)
+# D) Prostřední tabulka = Statistiky
+    if not df.empty:
+        ax_middle = fig.add_subplot(gs[1:, 1])
+        ax_middle.axis('tight')
+        ax_middle.axis('off')
+        table_middle = ax_middle.table(
+            cellText=df.values,
+            colLabels=df.columns,
+            loc='upper center')
+        table_middle.auto_set_font_size(False)
+        table_middle.set_fontsize(12)
+        table_middle.scale(1.2, 1.6)
 
-    for (row, col), cell in table_middle.get_celld().items():
-        if row == 0:
+        for (row, col), cell in table_middle.get_celld().items():
+            if row == 0:
             # Header row: můžeme schovat nebo dát šedé pozadí
-            cell.set_facecolor(to_rgba('lightgrey', alpha=1))
-        else:
-            # Podmíněné barvení: home > away => green pro home, red pro away atd.
-            home_value = df_cleaned.iloc[row - 1, 0]  # Domácí
-            away_value = df_cleaned.iloc[row - 1, 2]  # Hosté
-
-            if col == 1:
-                # Prostřední sloupec (metric)
                 cell.set_facecolor(to_rgba('lightgrey', alpha=1))
-            elif col == 0:  # Domácí
-                if home_value is not None and away_value is not None:
-                    if home_value > away_value:
-                        cell.set_facecolor(to_rgba('green', alpha=0.5))
-                    elif home_value < away_value:
-                        cell.set_facecolor(to_rgba('red', alpha=0.5))
-                    else:
-                        cell.set_facecolor(to_rgba('yellow', alpha=0.5))
-            elif col == 2:  # Hosté
-                if home_value is not None and away_value is not None:
-                    if away_value > home_value:
-                        cell.set_facecolor(to_rgba('green', alpha=0.5))
-                    elif away_value < home_value:
-                        cell.set_facecolor(to_rgba('red', alpha=0.5))
-                    else:
-                        cell.set_facecolor(to_rgba('yellow', alpha=0.5))
+            else:
+                home_value = df_cleaned.iloc[row - 1, 0]  # Domácí
+                away_value = df_cleaned.iloc[row - 1, 2]  # Hosté
+
+                if col == 1:
+                    cell.set_facecolor(to_rgba('lightgrey', alpha=1))
+                elif col == 0:  # Domácí
+                    if home_value is not None and away_value is not None:
+                        if home_value > away_value:
+                            cell.set_facecolor(to_rgba('green', alpha=0.5))
+                        elif home_value < away_value:
+                            cell.set_facecolor(to_rgba('red', alpha=0.5))
+                        else:
+                            cell.set_facecolor(to_rgba('yellow', alpha=0.5))
+                elif col == 2:  # Hosté
+                    if home_value is not None and away_value is not None:
+                        if away_value > home_value:
+                            cell.set_facecolor(to_rgba('green', alpha=0.5))
+                        elif away_value < home_value:
+                            cell.set_facecolor(to_rgba('red', alpha=0.5))
+                        else:
+                            cell.set_facecolor(to_rgba('yellow', alpha=0.5))
 
         # Nastavení šířek
-        if col == 1:
-            cell.set_width(1.25)
-        else:
-            cell.set_width(0.4)
-        cell.set_text_props(ha='center', fontproperties=fp_pop2)
+            if col == 1:
+                cell.set_width(1.25)
+            else:
+                cell.set_width(0.4)
+            cell.set_text_props(ha='center', fontproperties=fp_pop2)
+    else:
+        st.warning("Tabulka statistik je prázdná – nic nevykresluji.")
 
-    # E) Pravá tabulka = Hosté
-    ax_right = fig.add_subplot(gs[1:, 2])
-    ax_right.axis('tight')
-    ax_right.axis('off')
-    table_right = ax_right.table(
-        cellText=away_df.values,
-        colLabels=away_df.columns,
-        loc='upper center'
-    )
-    table_right.auto_set_font_size(False)
-    table_right.set_fontsize(12)
-    table_right.scale(1.2, 1.6)
+# E) Pravá tabulka = Hosté
+    if not away_df.empty:
+        ax_right = fig.add_subplot(gs[1:, 2])
+        ax_right.axis('tight')
+        ax_right.axis('off')
+        table_right = ax_right.table(
+            cellText=away_df.values,
+            colLabels=away_df.columns,
+            loc='upper center')
+        table_right.auto_set_font_size(False)
+        table_right.set_fontsize(12)
+        table_right.scale(1.2, 1.6)
 
-    for (row, col), cell in table_right.get_celld().items():
-        if row > 0:  # vynechat header
-            rating = float(away_df.iloc[row - 1, rating_col_index])
-            base_color = get_rating_color(rating)
-            rgba_color = to_rgba(base_color, alpha=0.5)
-            cell.set_facecolor(rgba_color)
-        else:
-            cell.set_facecolor(to_rgba('lightgrey', alpha=1.0))
+        rating_col_index = 3
+        for (row, col), cell in table_right.get_celld().items():
+            if row > 0:  # vynechat header
+                rating = float(away_df.iloc[row - 1, rating_col_index])
+                base_color = get_rating_color(rating)
+                rgba_color = to_rgba(base_color, alpha=0.5)
+                cell.set_facecolor(rgba_color)
+            else:
+                cell.set_facecolor(to_rgba('lightgrey', alpha=1.0))
 
-        if col == 0:
-            cell.set_width(0.45)
-        elif col == 1:
-            cell.set_width(0.1)
-        elif col == 2:
-            cell.set_width(0.15)
-        else:
-            cell.set_width(0.2)
-        cell.set_text_props(ha='center', fontproperties=fp_pop2)
+            if col == 0:
+                cell.set_width(0.45)
+            elif col == 1:
+                cell.set_width(0.1)
+            elif col == 2:
+                cell.set_width(0.15)
+            else:
+                cell.set_width(0.2)
+            cell.set_text_props(ha='center', fontproperties=fp_pop2)
+    else:
+        st.warning("Tabulka hostů je prázdná – nic nevykresluji.")
 
     plt.subplots_adjust(wspace=0.5, hspace=0.25)
     for ax in fig.get_axes():
