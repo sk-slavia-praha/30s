@@ -246,6 +246,44 @@ def main():
             momentum = momentum[~momentum['minute'].isin([45.5, 90.5])]
     finally:
         driver.quit()
+    # -----------------------------------------------------------------------------
+    # 2) Stažení výsledku zápasu
+    # -----------------------------------------------------------------------------
+    home_score = 0
+    away_score = 0
+
+    try:
+        # Načtení stránky
+        driver.get(url)
+    
+        # Vyhledání JSON dat na stránce (předpokládáme, že jsou uvnitř <pre> tagu)
+        pre_element = driver.find_element(By.TAG_NAME, 'pre')
+        json_text = pre_element.text
+
+        # Načtení JSON dat
+        data = json.loads(json_text)
+
+        # Extrakce incidentů s textem "FT" a obsahem homeScore i awayScore
+        extracted_data = [
+            {
+            "text": incident["text"],
+            "homeScore": incident["homeScore"],
+            "awayScore": incident["awayScore"]
+            }
+            for incident in data.get("incidents", [])
+            if incident.get("text") == "FT" and "homeScore" in incident and "awayScore" in incident]
+
+        # Pokud najdeme data, vezmeme první záznam; jinak ponecháme 0-0
+        if extracted_data:
+            entry = extracted_data[0]
+            home_score = entry['homeScore']
+            away_score = entry['awayScore']
+
+        print(f"{home_score} - {away_score}")
+
+    finally:
+        # Zavření prohlížeče
+        driver.quit()
 
     # -----------------------------------------------------------------------------
     # 2) Stažení JSONu pro statistiky
