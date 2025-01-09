@@ -455,7 +455,7 @@ def main():
     
     plt.text(
         0.52, 0.92,
-        f"{home_team} x {away_team} {homeScore}-{awayScore}",
+        f"{home_team} x {away_team} {home_score}-{away_score}",
         fontproperties=fp_pop, fontsize=22, fontweight='bold', ha='center',
         transform=fig.transFigure
     )
