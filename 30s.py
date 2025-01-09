@@ -313,6 +313,7 @@ def main():
     extracted_metrics = extract_metrics_from_json(json_data, required_metrics)
     df = extracted_metrics
     st.write(df)
+    df.drop_duplicates(subset=["Sloupec"], inplace=True)
     df.set_index("Sloupec", inplace=True)
 
     # Seřadíme řádky podle pořadí v required_metrics
