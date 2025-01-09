@@ -126,6 +126,20 @@ def extract_metrics_from_json(json_data, metrics):
                 }
     return extracted_data
 
+def extract_players(data, team_type):
+    players = data[team_type]['players']
+    extracted_data = []
+    for player_data in players:
+        player = player_data['player']
+        statistics = player_data.get('statistics', {})
+        extracted_data.append({
+            'Hráč': player.get('shortName'),
+            "Č.": player.get('jerseyNumber'),
+            'Pozice': player_data.get('position'),
+            'Známka': statistics.get('rating'),
+            'Minuty': statistics.get('minutesPlayed'),
+        })
+    return extracted_data
 # -----------------------------------------------------------------------------
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
@@ -242,33 +256,55 @@ def main():
 
     url_lineups = f"https://www.sofascore.com/api/v1/event/{match_id}/lineups"
     driver = webdriver.Chrome(options=chrome_options)
+  
+
+    url = f"https://www.sofascore.com/api/v1/event/{match_id}/lineups"
     try:
-        driver.get(url_lineups)
+        # Načtení stránky s JSON
+        driver.get(url)
+
+        # SofaScore API vrací JSON přímo v <pre> tagu
         pre_element = driver.find_element(By.TAG_NAME, 'pre')
-        json_lineups = json.loads(pre_element.text)
+        json_text = pre_element.text
 
-        # Funkce pro extrakci hráčů
-        def extract_players(data, team_type):
-            players = data[team_type]['players']
-            extracted_data = []
-            for player_data in players:
-                player = player_data['player']
-                statistics = player_data.get('statistics', {})
-                extracted_data.append({
-                    'Hráč': player.get('shortName'),
-                    'Č.': player.get('jerseyNumber'),
-                    'Pozice': player_data.get('position'),   # G, D, M, F
-                    'Známka': statistics.get('rating'),
-                    'Minuty': statistics.get('minutesPlayed'),
-                        })
-                return extracted_data
+        data = json.loads(json_text)
 
-    # Extrakce domácích a hostů
-        home_players = extract_players(json_lineups, 'home')
-        away_players = extract_players(json_lineups, 'away')
+            # Extrakce hráčů
+        home_players = extract_players(data, 'home')
+        away_players = extract_players(data, 'away')
 
         home_df = pd.DataFrame(home_players)
         away_df = pd.DataFrame(away_players)
+
+            # Převod pozic z písmen na názvy
+        position_names = {'G': 'Br', 'D': 'Obr', 'M': 'Zál', 'F': 'Ú'}
+
+        # Zahodíme řádky s NaN u Známky (obvykle náhradníci bez ratingu)
+        home_df = home_df.dropna(subset=['Známka'])
+        away_df = away_df.dropna(subset=['Známka'])
+
+            # Nahradíme kódy pozic
+        home_df['Pozice'] = home_df['Pozice'].map(position_names)
+        away_df['Pozice'] = away_df['Pozice'].map(position_names)
+
+            # Seřazení podle pozice a známky
+        position_order = {'Br': 1, 'Obr': 2, 'Zál': 3, 'Ú': 4}
+        home_df['PositionOrder'] = home_df['Pozice'].map(position_order)
+        away_df['PositionOrder'] = away_df['Pozice'].map(position_order)
+
+        home_df = home_df.sort_values(
+                by=['PositionOrder', 'Známka'],
+                ascending=[True, False]
+            ).drop(columns='PositionOrder')
+
+        away_df = away_df.sort_values(
+                by=['PositionOrder', 'Známka'],
+                ascending=[True, False]
+            ).drop(columns='PositionOrder')
+
+            # Převod minut na int
+        home_df['Minuty'] = home_df['Minuty'].astype(int)
+        away_df['Minuty'] = away_df['Minuty'].astype(int)
 
     finally:
         driver.quit()
