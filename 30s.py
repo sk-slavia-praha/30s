@@ -443,10 +443,17 @@ def main():
     # B) Horní graf = momentum
     ax_top = fig.add_subplot(gs[0, :])
     # Vybarvení sloupců podle kladné/záporné hodnoty
-    colors = [home_color if value > 0 else away_color for value in momentum['value']]
+    if not momentum.empty:
+        colors = [home_color if value > 0 else away_color for value in momentum['value']]
+        ax_top.bar(momentum['minute'], momentum['value'], color=colors,
+               alpha=0.65, edgecolor='black')
+        ax_top.axhline(y=0, color='gray', linestyle='-', linewidth=1, alpha=0.8, zorder=1)
+        ax_top.bar(momentum['minute'], momentum['value'], color=colors, alpha=0.65, edgecolor='black')
+    else:
+        st.warning("Data pro momentum nejsou k dispozici, graf se nevykreslil.")
+    
 
-    ax_top.axhline(y=0, color='gray', linestyle='-', linewidth=1, alpha=0.8, zorder=1)
-    ax_top.bar(momentum['minute'], momentum['value'], color=colors, alpha=0.65, edgecolor='black')
+
     add_logo(ax_top, home_logo, x=-1, y=50, zoom=0.25)
     add_logo(ax_top, away_logo, x=-1, y=-50, zoom=0.25)
 
