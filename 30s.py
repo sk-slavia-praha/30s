@@ -515,9 +515,18 @@ def main():
 
     plt.subplots_adjust(wspace=0.5, hspace=0.25)
     for ax in fig.get_axes():
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for spine in ax.spines.values():
+        if ax is ax_top:
+            # Nechceme Y osu (ticks ani spine), ale X osu ponecháme
+            ax.set_yticks([])
+            ax.spines['left'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['top'].set_visible(False)
+            # spodní (bottom) spine + xticks necháme
+        else:
+            # Všechny ostatní ax (tabulky) zbavíme i X i Y os
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
                 spine.set_visible(False)
     # -----------------------------------------------------------------------------
     # 5) Zobrazení výsledného obrázku ve Streamlitu
