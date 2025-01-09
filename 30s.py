@@ -156,10 +156,35 @@ def extract_metrics_from_json(json_data, metrics):
     return df
 
 def extract_players(data, team_type):
-    players = data[team_type]['players']
+    """
+    Vrací DataFrame s údaji o hráčích:
+      - "Hráč"
+      - "Č." (číslo dresu)
+      - "Pozice"
+      - "Známka" (rating)
+      - "Minuty" (odehrané minuty)
+
+    Pokud v `data` pro `team_type` nic není,
+    nebo tam není klíč "players", nebo je seznam prázdný,
+    vrátí prázdný DataFrame s očekávanými sloupci.
+    """
+    # 1) Předem definujeme prázdný DF se správnými sloupci
+    df_empty = pd.DataFrame(columns=["Hráč", "Č.", "Pozice", "Známka", "Minuty"])
+
+    # 2) Ověříme, zda data obsahují klíče, které potřebujeme
+    if team_type not in data:
+        return df_empty
+    if "players" not in data[team_type]:
+        return df_empty
+
+    players = data[team_type]["players"]
+    if not players:
+        return df_empty
+
+    # 3) Naplníme list slovníků (pokud existují hráči)
     extracted_data = []
     for player_data in players:
-        player = player_data['player']
+        player = player_data.get('player', {})
         statistics = player_data.get('statistics', {})
         extracted_data.append({
             'Hráč': player.get('shortName'),
@@ -168,7 +193,10 @@ def extract_players(data, team_type):
             'Známka': statistics.get('rating'),
             'Minuty': statistics.get('minutesPlayed'),
         })
-    return extracted_data
+
+    # 4) Převedeme list slovníků do DataFrame
+    df = pd.DataFrame(extracted_data, columns=["Hráč", "Č.", "Pozice", "Známka", "Minuty"])
+    return df
 # -----------------------------------------------------------------------------
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
