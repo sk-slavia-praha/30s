@@ -288,7 +288,7 @@ def main():
         driver.quit()
 
     # -----------------------------------------------------------------------------
-    # 2) Stažení JSONu pro statistiky
+    # 3) Stažení JSONu pro statistiky
     # -----------------------------------------------------------------------------
     url_stats = f"https://www.sofascore.com/api/v1/event/{match_id}/statistics"
     driver = webdriver.Chrome(options=chrome_options)
@@ -357,7 +357,7 @@ def main():
     df_cleaned["Hosté"] = df_cleaned["Hosté"].apply(clean_percentage)
 
     # -----------------------------------------------------------------------------
-    # 3) Stažení sestav (domácí a hosté) z /lineups
+    # 4) Stažení sestav (domácí a hosté) z /lineups
     # -----------------------------------------------------------------------------
 
     url_lineups = f"https://www.sofascore.com/api/v1/event/{match_id}/lineups"
@@ -415,7 +415,7 @@ def main():
     finally:
         driver.quit()
 # -----------------------------------------------------------------------------
-# 4) Vyčištění a úprava tabulek
+# 5) Vyčištění a úprava tabulek
 # -----------------------------------------------------------------------------
 
 # Odstranit hráče, kteří nemají rating (např. náhradníci, co nenastoupili)
@@ -436,7 +436,7 @@ def main():
     away_df = away_df.sort_values(by=['PositionOrder', 'Známka'],
                               ascending=[True, False]).drop(columns='PositionOrder')
     # -----------------------------------------------------------------------------
-    # 5) Nakreslení obrázku s tabulkami a momentum grafem
+    # 6) Nakreslení obrázku s tabulkami a momentum grafem
     # -----------------------------------------------------------------------------
     # Načteme loga
     try:
