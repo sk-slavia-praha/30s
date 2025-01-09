@@ -468,13 +468,13 @@ def main():
     )
     # Popisky týmů nad tabulkami
     plt.text(
-        0.395, 0.60,
+        0.395, 0.62,
         f"{home_team}",
         fontproperties=fp_pop, fontsize=12, ha='left',
         transform=fig.transFigure
     )
     plt.text(
-        0.63, 0.59,
+        0.63, 0.63,
         f"{away_team}",
         fontproperties=fp_pop, fontsize=12, ha='right',
         transform=fig.transFigure
