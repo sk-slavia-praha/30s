@@ -154,7 +154,6 @@ def extract_metrics_from_json(json_data, metrics):
 
     # V opačném případě vytvoříme z data_rows DataFrame
     df = pd.DataFrame(data_rows, columns=["Sloupec", "Domácí", "Hosté"])
-    st.write(df)
     return df
 
 def extract_players(data, team_type):
@@ -312,7 +311,6 @@ def main():
     # Extrakce metrik
     extracted_metrics = extract_metrics_from_json(json_data, required_metrics)
     df = extracted_metrics
-    st.write(df)
     df.drop_duplicates(subset=["Sloupec"], inplace=True)
     df.set_index("Sloupec", inplace=True)
 
