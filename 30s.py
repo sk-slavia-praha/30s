@@ -1,3 +1,4 @@
+
 import streamlit as st
 import requests
 import os
@@ -251,7 +252,7 @@ def main():
     # -----------------------------------------------------------------------------
     home_score = 0
     away_score = 0
-    url = f"url = f"https://www.sofascore.com/api/v1/event/{match_id}/incidents"
+    url =  f"https://www.sofascore.com/api/v1/event/{match_id}/incidents"
     driver = webdriver.Chrome(options=chrome_options)
     try:
         # Načtení stránky
