@@ -375,7 +375,7 @@ def main():
         away_players = extract_players(data, 'away')
         home_team_id = data["home"]["players"][0]["teamId"]
         home_logo_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}/image"
-        away_team_id = data["home"]["players"][0]["teamId"]
+        away_team_id = data["away"]["players"][0]["teamId"]
         away_logo_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}/image"
 
         
