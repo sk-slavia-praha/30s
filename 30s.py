@@ -199,12 +199,12 @@ def extract_players(data, team_type):
     df = pd.DataFrame(extracted_data, columns=["Hráč", "Č.", "Pozice", "Známka", "Minuty"])
     return df
 
-    def extract_short_name(data):
+def extract_short_name(data):
     """
     Extrahuje `shortName` ze zadaného JSON data.
     Vrátí `shortName`, pokud existuje, jinak None.
     """
-        return data.get('team', {}).get('shortName', None)
+    return data.get('team', {}).get('shortName', None)
 # -----------------------------------------------------------------------------
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
