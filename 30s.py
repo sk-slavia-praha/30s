@@ -266,7 +266,10 @@ def main():
             "awayScore": incident["awayScore"]
             }
             for incident in data.get("incidents", [])
-            if incident.get("text") == "FT" and "homeScore" in incident and "awayScore" in incident]
+                if incident.get("text") in ["FT", "First Half", "Second Half"]
+                and "homeScore" in incident
+                and "awayScore" in incident
+            ]
 
         # Pokud najdeme data, vezmeme první záznam; jinak ponecháme 0-0
         if extracted_data:
