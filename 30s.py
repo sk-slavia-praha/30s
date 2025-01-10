@@ -211,7 +211,7 @@ def main():
     home_color = "blue"
     home_logo_url = "https://img.sofascore.com/api/v1/team/5970/image"
 
-    away_team = Western United"
+    away_team = "Western United"
     away_color = "red"
     away_logo_url = "https://img.sofascore.com/api/v1/team/193723"/image"
     match_id = st.number_input("Zadej match_id", value=12637112)
