@@ -91,9 +91,9 @@ def get_rating_color(rating):
     """
     Pomocná funkce: podle ratingu vrátí barvu (string).
     """
-    if rating <= 5:
+    if rating <= 6:
         return 'red'
-    elif rating <= 6:
+    elif rating <= 6.5:
         return 'orange'
     elif rating <= 7:
         return 'yellow'
