@@ -204,7 +204,7 @@ def extract_players(data, team_type):
     Extrahuje `shortName` ze zadaného JSON data.
     Vrátí `shortName`, pokud existuje, jinak None.
     """
-    return data.get('team', {}).get('shortName', None)
+        return data.get('team', {}).get('shortName', None)
 # -----------------------------------------------------------------------------
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
