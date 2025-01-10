@@ -212,15 +212,6 @@ def main():
     # Nastavení auto-refresh každých 60 sekund
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
 
-
-    # Ukázkové vstupy
-    home_team = "Melbourne Victory"
-    home_color = "blue"
-    
-
-    away_team = "Western United"
-    away_color = "red"
-    away_logo_url = "https://img.sofascore.com/api/v1/team/193723/image"
     match_id = st.number_input("Zadej match_id", value=12637112)
     datum = "10.01.2025"
 
