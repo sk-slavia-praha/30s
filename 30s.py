@@ -211,7 +211,8 @@ def extract_short_name(data):
 def main():
     # Nastavení auto-refresh každých 60 sekund
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
-
+    home_color="red"
+    away_color = "blue"
     match_id = st.number_input("Zadej match_id", value=12637112)
     datum = "10.01.2025"
 
@@ -427,7 +428,7 @@ def main():
     away_team_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}"
     driver = webdriver.Chrome(options=chrome_options)
     try:
-        driver.get(home_team_url)
+        driver.get(away_team_url)
         pre_element = driver.find_element(By.TAG_NAME, 'pre')
         json_text = pre_element.text
 
