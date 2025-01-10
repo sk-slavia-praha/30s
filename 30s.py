@@ -433,7 +433,7 @@ def main():
     finally:    
        driver.quit() 
 
-    away_team_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}"
+    away_team_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}"
     driver = webdriver.Chrome(options=chrome_options)
     try:
         driver.get(home_team_url)
