@@ -198,6 +198,13 @@ def extract_players(data, team_type):
     # 4) Převedeme list slovníků do DataFrame
     df = pd.DataFrame(extracted_data, columns=["Hráč", "Č.", "Pozice", "Známka", "Minuty"])
     return df
+
+    def extract_short_name(data):
+    """
+    Extrahuje `shortName` ze zadaného JSON data.
+    Vrátí `shortName`, pokud existuje, jinak None.
+    """
+    return data.get('team', {}).get('shortName', None)
 # -----------------------------------------------------------------------------
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
@@ -209,7 +216,7 @@ def main():
     # Ukázkové vstupy
     home_team = "Melbourne Victory"
     home_color = "blue"
-    home_logo_url = "https://img.sofascore.com/api/v1/team/5970/image"
+    
 
     away_team = "Western United"
     away_color = "red"
@@ -367,7 +374,14 @@ def main():
         home_players = extract_players(data, 'home')
         away_players = extract_players(data, 'away')
         home_team_id = data["home"]["players"][0]["teamId"]
-        st.write(home_team_id)
+        home_logo_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}/image"
+        away_team_id = data["home"]["players"][0]["teamId"]
+        away_logo_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}/image"
+
+        
+
+
+        
         home_df = pd.DataFrame(home_players)
         away_df = pd.DataFrame(away_players)
 
@@ -403,6 +417,37 @@ def main():
 
     finally:
         driver.quit()
+
+    home_team_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}"
+    driver = webdriver.Chrome(options=chrome_options)
+    try:
+        driver.get(home_team_url)
+        pre_element = driver.find_element(By.TAG_NAME, 'pre')
+        json_text = pre_element.text
+
+        # Parsování JSON dat
+        data = json.loads(json_text)
+
+        # Extrakce shortName
+        home_team = extract_short_name(data)
+    finally:    
+       driver.quit() 
+
+    away_team_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}"
+    driver = webdriver.Chrome(options=chrome_options)
+    try:
+        driver.get(home_team_url)
+        pre_element = driver.find_element(By.TAG_NAME, 'pre')
+        json_text = pre_element.text
+
+        # Parsování JSON dat
+        data = json.loads(json_text)
+
+        # Extrakce shortName
+        away_team = extract_short_name(data)
+    finally:    
+       driver.quit() 
+    
 # -----------------------------------------------------------------------------
 # 5) Vyčištění a úprava tabulek
 # -----------------------------------------------------------------------------
