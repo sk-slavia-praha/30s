@@ -259,24 +259,12 @@ def main():
         data = json.loads(json_text)
 
         # Extrakce incidentů s textem "FT" a obsahem homeScore i awayScore
-        extracted_data = [
-            {
-            "text": incident["text"],
-            "homeScore": incident["homeScore"],
-            "awayScore": incident["awayScore"]
-            }
-            for incident in data.get("incidents", [])
-                if incident.get("text") in ["FT", "First Half", "Second Half"]
-                and "homeScore" in incident
-                and "awayScore" in incident
-            ]
-
+        for incident in reversed(data.get("incidents", [])):
+              if "homeScore" in incident and "awayScore" in incident:
+                # Aktualizace skóre na základě incidentu
+                    home_score = incident["homeScore"]
+                    away_score = incident["awayScore"]
         # Pokud najdeme data, vezmeme první záznam; jinak ponecháme 0-0
-        if extracted_data:
-            entry = extracted_data[0]
-            home_score = entry['homeScore']
-            away_score = entry['awayScore']
-
         print(f"{home_score} - {away_score}")
 
     finally:
