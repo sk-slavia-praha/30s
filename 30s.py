@@ -366,7 +366,8 @@ def main():
             # Extrakce hráčů
         home_players = extract_players(data, 'home')
         away_players = extract_players(data, 'away')
-
+        home_team_id = data["home"]["players"][0]["teamId"]
+        st.write(home_team_id)
         home_df = pd.DataFrame(home_players)
         away_df = pd.DataFrame(away_players)
 
