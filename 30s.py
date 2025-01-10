@@ -205,25 +205,18 @@ def main():
     # Nastavení auto-refresh každých 60 sekund
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
 
-    st.write(f"Stránka se znovu načetla: {count}×")
-    st.title("Ukázka SofaScore zápasu se Seleniem a grafikou")
 
     # Ukázkové vstupy
-    home_team = "Chennaiyin"
+    home_team = "Melbourne Victory"
     home_color = "blue"
-    home_logo_url = "https://img.sofascore.com/api/v1/team/174590/image"
+    home_logo_url = "https://img.sofascore.com/api/v1/team/5970/image"
 
-    away_team = "Odisha"
+    away_team = Western United"
     away_color = "red"
-    away_logo_url = "https://img.sofascore.com/api/v1/team/174592/image"
+    away_logo_url = "https://img.sofascore.com/api/v1/team/193723"/image"
+    match_id = st.number_input("Zadej match_id", value=12637112)
+    datum = "10.01.2025"
 
-    datum = "09.01.2025"
-    match_id = 13077964
-
-    # Volitelně: umožnit uživateli zadat si i jiná data
-    # match_id = st.number_input("Zadej match_id", value=12580722)
-    # home_team = st.text_input("Domácí tým", "Teplice")
-    # away_team = st.text_input("Hostující tým", "Slavia Praha")
 
     # -----------------------------------------------------------------------------
     # 1) Stažení JSONu pro momentum
