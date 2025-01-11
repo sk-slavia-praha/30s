@@ -213,8 +213,8 @@ def main():
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
     home_color="red"
     away_color = "blue"
-    match_id = st.number_input("Zadej match_id", value=12637112)
-    datum = "10.01.2025"
+    match_id = st.number_input("Zadej match_id", value=12499647)
+    #datum = "10.01.2025"
 
 
     # -----------------------------------------------------------------------------
@@ -486,12 +486,9 @@ def main():
         transform=fig.transFigure
     )
     # Podtitul
-    plt.text(
-        0.52, 0.90,
-        f"{datum}",
-        fontproperties=fp_pop2, ha='center',
-        transform=fig.transFigure
-    )
+    #plt.text(0.52, 0.90,f"{datum}",fontproperties=fp_pop2, ha='center',transform=fig.transFigure)
+
+    
     # Popisky týmů nad tabulkami
     plt.text(
         0.395, 0.63,
