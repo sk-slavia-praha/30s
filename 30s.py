@@ -671,15 +671,6 @@ def main():
     # 6) Zobrazení výsledného obrázku ve Streamlitu
     # -----------------------------------------------------------------------------
     st.pyplot(fig)
-    st.download_button(
-    label="Stáhnout obrázek",
-    data=buffer,
-    file_name="graf.png",
-    mime="image/png"
-    )
-    st.markdown(
-    f'<a href="data:image/png;base64,{buffer.getvalue().hex()}" target="_blank">Otevřít obrázek v nové kartě</a>',
-    unsafe_allow_html=True
-    )
+
 if __name__ == "__main__":
     main()
