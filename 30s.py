@@ -12,6 +12,7 @@ from io import BytesIO
 from collections import Counter
 import numpy as np
 from streamlit_autorefresh import st_autorefresh
+from collections import Counter
 
 # -- Selenium
 from selenium import webdriver
@@ -205,6 +206,24 @@ def extract_short_name(data):
     Vrátí `shortName`, pokud existuje, jinak None.
     """
     return data.get('team', {}).get('shortName', None)
+
+def get_most_common_team_id(data, team_type):
+    """
+    Získá nejčastější ID týmu na základě hráčů v daném týmu (home/away).
+    Vrátí None, pokud neexistují hráči nebo chybí potřebné klíče.
+    """
+    if team_type not in data or 'players' not in data[team_type] or not data[team_type]['players']:
+        return None
+
+    # Extrahujeme všechna teamId z hráčů
+    team_ids = [player_data['teamId'] for player_data in data[team_type]['players'] if 'teamId' in player_data]
+    
+    if not team_ids:
+        return None
+
+    # Najdeme nejčastější ID týmu
+    most_common_team_id = Counter(team_ids).most_common(1)[0][0]
+    return most_common_team_id
 # -----------------------------------------------------------------------------
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
@@ -365,9 +384,11 @@ def main():
             # Extrakce hráčů
         home_players = extract_players(data, 'home')
         away_players = extract_players(data, 'away')
-        home_team_id = data["home"]["players"][0]["teamId"]
+        home_team_id = get_most_common_team_id(data, 'home')
+        #home_team_id = data["home"]["players"][0]["teamId"]
         home_logo_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}/image"
-        away_team_id = data["away"]["players"][0]["teamId"]
+        away_team_id = get_most_common_team_id(data, 'away')
+        #away_team_id = data["away"]["players"][0]["teamId"]
         away_logo_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}/image"
 
         
