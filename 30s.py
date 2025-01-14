@@ -503,16 +503,13 @@ def main():
             try:
                 home_logo = load_logo(home_logo_url)
             except ValueError:
-                st.write(f"URL {home_logo_url} neobsahuje validní obrázek.")
+                st.write("Loga nejsou načtena. Zápas ještě nezačal")
 
         if away_logo_url:
             try:
                 away_logo = load_logo(away_logo_url)
-            except ValueError:
-                st.write(f"URL {away_logo_url} neobsahuje validní obrázek.")
 
-    except Exception as e:
-        st.write(f"Neočekávaná chyba: {e}")
+
 
     
     fig = plt.figure(figsize=(16, 12))
