@@ -502,12 +502,7 @@ def main():
         st.write(e)
 
 
-    # Přidání loga, pokud je k dispozici
-    if home_logo:
-        add_logo(ax_top, home_logo, x=-1, y=50, zoom=0.25)
 
-    if away_logo:
-        add_logo(ax_top, away_logo, x=-1, y=-50, zoom=0.25)
     
     fig = plt.figure(figsize=(16, 12))
     gs = GridSpec(3, 3, height_ratios=[1.5, 1, 2.5], width_ratios=[2, 1, 2])
@@ -552,9 +547,12 @@ def main():
     else:
         st.write("")
     
+    # Přidání loga, pokud je k dispozici
+    if home_logo:
+        add_logo(ax_top, home_logo, x=-1, y=50, zoom=0.25)
 
-
-
+    if away_logo:
+        add_logo(ax_top, away_logo, x=-1, y=-50, zoom=0.25)
 
     ax_top.axvline(x=45.5, color='black', linestyle='--', linewidth=3)
     ax_top.set_xticks(range(0, 91, 10))
