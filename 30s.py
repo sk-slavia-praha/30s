@@ -386,12 +386,17 @@ def main():
         away_players = extract_players(data, 'away')
         home_team_id = get_most_common_team_id(data, 'home')
         #home_team_id = data["home"]["players"][0]["teamId"]
+        if home_team_id:
+            home_logo_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}/image"
+        else:
+            home_logo_url = ""
         home_logo_url = f"https://img.sofascore.com/api/v1/team/{home_team_id}/image"
         away_team_id = get_most_common_team_id(data, 'away')
         #away_team_id = data["away"]["players"][0]["teamId"]
-        away_logo_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}/image"
-
-        
+        if away_team_id:
+            away_logo_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}/image"
+        else
+            away_logo_url =""  
 
 
         
@@ -443,6 +448,8 @@ def main():
 
         # Extrakce shortName
         home_team = extract_short_name(data)
+        if not home_team:
+            home_team = ""
     finally:    
        driver.quit() 
 
@@ -458,6 +465,8 @@ def main():
 
         # Extrakce shortName
         away_team = extract_short_name(data)
+        if not away_team:
+            away_team = ""
     finally:    
        driver.quit() 
     
@@ -487,12 +496,19 @@ def main():
     # -----------------------------------------------------------------------------
     # Načteme loga
     try:
-        home_logo = load_logo(home_logo_url)
-        away_logo = load_logo(away_logo_url)
+        home_logo = load_logo(home_logo_url) if home_logo_url else None
+        away_logo = load_logo(away_logo_url) if away_logo_url else None
     except ValueError as e:
         st.write(e)
-        st.stop()
 
+
+    # Přidání loga, pokud je k dispozici
+    if home_logo:
+        add_logo(ax_top, home_logo, x=-1, y=50, zoom=0.25)
+
+    if away_logo:
+        add_logo(ax_top, away_logo, x=-1, y=-50, zoom=0.25)
+    
     fig = plt.figure(figsize=(16, 12))
     gs = GridSpec(3, 3, height_ratios=[1.5, 1, 2.5], width_ratios=[2, 1, 2])
 
@@ -538,8 +554,7 @@ def main():
     
 
 
-    add_logo(ax_top, home_logo, x=-1, y=50, zoom=0.25)
-    add_logo(ax_top, away_logo, x=-1, y=-50, zoom=0.25)
+
 
     ax_top.axvline(x=45.5, color='black', linestyle='--', linewidth=3)
     ax_top.set_xticks(range(0, 91, 10))
