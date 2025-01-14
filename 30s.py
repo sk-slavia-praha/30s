@@ -496,10 +496,20 @@ def main():
     # -----------------------------------------------------------------------------
     # Načteme loga
     try:
-        home_logo = load_logo(home_logo_url) if home_logo_url else None
-        away_logo = load_logo(away_logo_url) if away_logo_url else None
-    except ValueError as e:
-        st.write(e)
+        home_logo = None
+        away_logo = None
+
+    if home_logo_url:
+        try:
+            home_logo = load_logo(home_logo_url)
+        except ValueError:
+            st.write(f"URL {home_logo_url} neobsahuje validní obrázek.")
+
+    if away_logo_url:
+        try:
+            away_logo = load_logo(away_logo_url)
+        except ValueError:
+            st.write(f"URL {away_logo_url} neobsahuje validní obrázek.")
 
 
 
