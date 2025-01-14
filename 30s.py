@@ -395,7 +395,7 @@ def main():
         #away_team_id = data["away"]["players"][0]["teamId"]
         if away_team_id:
             away_logo_url = f"https://img.sofascore.com/api/v1/team/{away_team_id}/image"
-        else
+        else:
             away_logo_url =""  
 
 
