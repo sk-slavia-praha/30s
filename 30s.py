@@ -503,14 +503,16 @@ def main():
             try:
                 home_logo = load_logo(home_logo_url)
             except ValueError:
-                st.write("Loga nejsou načtena. Zápas ještě nezačal")
+                st.write("")
 
         if away_logo_url:
             try:
                 away_logo = load_logo(away_logo_url)
+            except ValueError:
+                st.write("")
 
-
-
+    finally:
+        st.write("Zápas ještě nezačal")
     
     fig = plt.figure(figsize=(16, 12))
     gs = GridSpec(3, 3, height_ratios=[1.5, 1, 2.5], width_ratios=[2, 1, 2])
