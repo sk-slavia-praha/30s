@@ -232,7 +232,7 @@ def main():
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
     home_color="red"
     away_color = "blue"
-    match_id = st.number_input("Zadej match_id", value=12499647)
+    match_id = st.number_input("Zadej match_id", value=13339435)
     #datum = "10.01.2025"
 
 
@@ -495,7 +495,7 @@ def main():
     # 6) Nakreslení obrázku s tabulkami a momentum grafem
     # -----------------------------------------------------------------------------
     # Načteme loga
-    try:
+        try:
         home_logo = None
         away_logo = None
 
@@ -512,7 +512,7 @@ def main():
                 st.write("")
 
     finally:
-        st.write("Zápas ještě nezačal")
+        st.write("")
     
     fig = plt.figure(figsize=(16, 12))
     gs = GridSpec(3, 3, height_ratios=[1.5, 1, 2.5], width_ratios=[2, 1, 2])
@@ -544,7 +544,7 @@ def main():
         fontproperties=fp_pop, fontsize=12, ha='right',
         transform=fig.transFigure
     )
-
+    
     # B) Horní graf = momentum
     ax_top = fig.add_subplot(gs[0, :])
     # Vybarvení sloupců podle kladné/záporné hodnoty
