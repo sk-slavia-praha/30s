@@ -495,7 +495,7 @@ def main():
     # 6) Nakreslení obrázku s tabulkami a momentum grafem
     # -----------------------------------------------------------------------------
     # Načteme loga
-        try:
+    try:
         home_logo = None
         away_logo = None
 
