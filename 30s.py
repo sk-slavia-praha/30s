@@ -512,7 +512,7 @@ def main():
                 st.write("")
 
     finally:
-        st.write("")
+        pass
     
     fig = plt.figure(figsize=(16, 12))
     gs = GridSpec(3, 3, height_ratios=[1.5, 1, 2.5], width_ratios=[2, 1, 2])
