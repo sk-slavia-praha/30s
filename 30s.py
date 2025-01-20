@@ -232,7 +232,7 @@ def main():
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
     home_color="red"
     away_color = "blue"
-    match_id = st.number_input("Zadej match_id", value=12436511)
+    match_id = st.number_input("Zadej match_id", value=12764147)
     #datum = "10.01.2025"
 
 
