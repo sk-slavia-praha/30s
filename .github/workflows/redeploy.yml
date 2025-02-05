@@ -1,0 +1,22 @@
+name: Redeploy Streamlit App
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"  # Spustí se každých 48 hodin
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions Bot"
+
+      - name: Trigger redeployment
+        run: |
+          git commit --allow-empty -m "Trigger redeploy"
+          git push
