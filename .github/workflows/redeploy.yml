@@ -2,7 +2,7 @@ name: Redeploy Streamlit App
 
 on:
   schedule:
-    - cron: "0 */2 * * *"  # Spustí se každých 48 hodin
+    - cron: "*/10 * * * *" # Spustí se každých 48 hodin
 
 jobs:
   redeploy:
