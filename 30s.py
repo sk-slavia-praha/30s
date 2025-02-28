@@ -241,7 +241,7 @@ def main():
     home_color="red"
     away_color = "blue"
     match_list = load_data()
-    if not df.empty:
+    if not match_list.empty:
         posledni_zapas_id = match_list["match_id"].iloc[-1]  # Poslední zápas jako defaultní
     else:
         posledni_zapas_id = 0
