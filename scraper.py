@@ -45,8 +45,9 @@ try:
 
         # 📊 Přidání nových zápasů a odstranění duplikátů
         df_new_matches = pd.DataFrame(new_matches, columns=["match_id", "date", "home_team", "home_team_id", "away_team", "away_team_id"])
-        df_all_matches = pd.concat([df_all_matches, df_new_matches]).drop_duplicates()
-
+        df_all_matches = pd.concat([df_all_matches, df_new_matches]).drop_duplicates("match_id")
+        df_all_matches = df_all_matches.sort_values(by='date',ascending=False)
+        df_all_matches["Home_team - Away_team"] = df_all_matches["home_team"] + " - " + df_all_matches["away_team"]
         # 🔍 Filtr na posledních 365 dní
         df_all_matches = df_all_matches[df_all_matches["date"] >= one_year_ago]
 
