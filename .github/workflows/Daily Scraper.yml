@@ -30,6 +30,6 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "GitHub Actions Bot"
-          git add data/all_matches.csv
+          git add all_matches.csv
           git commit -m "🔄 Daily match update" || echo "No changes to commit"
           git push
