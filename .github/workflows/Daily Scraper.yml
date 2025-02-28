@@ -1,0 +1,35 @@
+name: Daily Scraper
+
+on:
+  schedule:
+    - cron: "0 7 * * *"  # Spustí se každý den v 8:00 českého času (7:00 UTC)
+  workflow_dispatch:  # Možnost manuálního spuštění z GitHubu
+
+jobs:
+  scrape_and_commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests
+
+      - name: Run scraper
+        run: python scraper.py  # Spustí aktualizaci CSV souboru
+
+      - name: Commit updated data
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions Bot"
+          git add data/all_matches.csv
+          git commit -m "🔄 Daily match update" || echo "No changes to commit"
+          git push
