@@ -229,7 +229,7 @@ def load_data():
     df = pd.read_csv("all_matches.csv")  # Uprav podle názvu souboru
     return df
 
-df = load_data()
+
 
 
 # -----------------------------------------------------------------------------
@@ -240,14 +240,14 @@ def main():
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
     home_color="red"
     away_color = "blue"
-
+    match_list = load_data()
     if not df.empty:
-        posledni_zapas_id = df["match_id"].iloc[-1]  # Poslední zápas jako defaultní
+        posledni_zapas_id = match_list["match_id"].iloc[-1]  # Poslední zápas jako defaultní
     else:
         posledni_zapas_id = 0
 
     # Možnost vybrat zápas podle názvu
-    vybrany_zapas = st.selectbox("Vyber zápas", df["nazev_zapasu"].tolist())
+    vybrany_zapas = st.selectbox("Vyber zápas", match_list["nazev_zapasu"].tolist())
     match_id = df[df["nazev_zapasu"] == vybrany_zapas]["match_id"].values[0]
     #datum = "10.01.2025"
 
