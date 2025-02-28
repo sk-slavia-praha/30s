@@ -224,6 +224,14 @@ def get_most_common_team_id(data, team_type):
     # Najdeme nejčastější ID týmu
     most_common_team_id = Counter(team_ids).most_common(1)[0][0]
     return most_common_team_id
+
+def load_data():
+    df = pd.read_csv("zapasy.csv")  # Uprav podle názvu souboru
+    return df
+
+df = load_data()
+
+
 # -----------------------------------------------------------------------------
 # Hlavní Streamlit aplikace
 # -----------------------------------------------------------------------------
@@ -232,7 +240,15 @@ def main():
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
     home_color="red"
     away_color = "blue"
-    match_id = st.number_input("Zadej match_id", value=12580787)
+
+    if not df.empty:
+        posledni_zapas_id = df["match_id"].iloc[-1]  # Poslední zápas jako defaultní
+    else:
+        posledni_zapas_id = 0
+
+    # Možnost vybrat zápas podle názvu
+    vybrany_zapas = st.selectbox("Vyber zápas", df["nazev_zapasu"].tolist())
+    match_id = df[df["nazev_zapasu"] == vybrany_zapas]["match_id"].values[0]
     #datum = "10.01.2025"
 
 
