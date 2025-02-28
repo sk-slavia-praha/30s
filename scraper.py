@@ -8,7 +8,7 @@ today = datetime.date.today().strftime("%Y-%m-%d")
 one_year_ago = datetime.date.today() - datetime.timedelta(days=365)
 
 # 📂 Cesta k CSV souboru
-csv_file_path = "data/all_matches.csv"
+csv_file_path = "all_matches.csv"  
 
 # 🏆 ID sledovaného týmu
 team_id_to_find = 2216
