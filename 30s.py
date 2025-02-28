@@ -247,8 +247,8 @@ def main():
         posledni_zapas_id = 0
 
     # Možnost vybrat zápas podle názvu
-    vybrany_zapas = st.selectbox("Vyber zápas", match_list["nazev_zapasu"].tolist())
-    match_id = df[df["nazev_zapasu"] == vybrany_zapas]["match_id"].values[0]
+    vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
+    match_id = df[df["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
     #datum = "10.01.2025"
 
 
