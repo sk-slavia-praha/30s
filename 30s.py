@@ -226,7 +226,7 @@ def get_most_common_team_id(data, team_type):
     return most_common_team_id
 
 def load_data():
-    df = pd.read_csv("zapasy.csv")  # Uprav podle názvu souboru
+    df = pd.read_csv("all_matches.csv")  # Uprav podle názvu souboru
     return df
 
 df = load_data()
