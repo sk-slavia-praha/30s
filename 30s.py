@@ -247,8 +247,9 @@ def main():
         posledni_zapas_id = 0
 
     # Možnost vybrat zápas podle názvu
-    vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
-    match_id = match_list[match_list["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
+    #vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
+    #match_id = match_list[match_list["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
+    match_id = st.number_input("Zadej match_id", value=12580787)
     #datum = "10.01.2025"
 
 
@@ -731,6 +732,6 @@ def main():
     # 6) Zobrazení výsledného obrázku ve Streamlitu
     # -----------------------------------------------------------------------------
     st.pyplot(fig)
-
+    st.write("Z MOL Cupu a přátelských zápasů nejsou data")
 if __name__ == "__main__":
     main()
