@@ -732,6 +732,6 @@ def main():
     # 6) Zobrazení výsledného obrázku ve Streamlitu
     # -----------------------------------------------------------------------------
     st.pyplot(fig)
-    st.write("Z MOL Cupu a přátelských zápasů nejsou data")
+    st.write("*Z MOL Cupu a přátelských zápasů nejsou data")
 if __name__ == "__main__":
     main()
