@@ -11,7 +11,7 @@ one_year_ago = datetime.date.today() - datetime.timedelta(days=365)
 csv_file_path = "all_matches.csv"  
 
 # 🏆 ID sledovaného týmu
-team_id_to_find = 2697   #2216
+team_id_to_find = 2216  #2216
 
 # 📥 Načtení existujícího souboru, pokud existuje
 if os.path.exists(csv_file_path):
