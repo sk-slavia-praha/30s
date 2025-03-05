@@ -267,8 +267,18 @@ def main():
         vybrany_zapas = st.selectbox("Vyber zápas", match_list[existing_column].tolist())
     else:
         st.error("Sloupec s názvem týmu nebyl nalezen.")
+
+    possible_column_names = ["Home_team - Away_team", "Home_team_Away_team"]
+
+    # Najdeme existující sloupec v datech
+    existing_column = next((col for col in possible_column_names if col in match_list.columns), None)
+
+    if existing_column:
+        match_id = match_list[match_list[existing_column] == vybrany_zapas]["match_id"].values[0]
+    else:
+        raise KeyError("Sloupec s názvem týmu nebyl nalezen.")
     #vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
-    match_id = match_list[match_list["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
+    #match_id = match_list[match_list["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
     #match_id = st.number_input("Zadej match_id", value=12580787)
     #datum = "10.01.2025"
 
