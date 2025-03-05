@@ -226,8 +226,19 @@ def get_most_common_team_id(data, team_type):
     return most_common_team_id
 
 def load_data():
-    df = pd.read_csv("all_matches.csv")  # Uprav podle názvu souboru
+    paths = ["all_matches.csv", "/data/in/tables/all_matches.csv"]
+    
+    df = None
+    for path in paths:
+        if os.path.exists(path):
+            df = pd.read_csv(path)
+            break
+    
+    if df is None:
+        raise FileNotFoundError("Soubor all_matches.csv nebyl nalezen v žádné z uvedených cest.")
+    
     return df
+
 
 
 
