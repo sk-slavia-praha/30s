@@ -263,10 +263,10 @@ def main():
     # Najdeme existující sloupec v datech
     existing_column = next((col for col in match_list.columns if col in possible_column_names), None)
 
-    if existing_column:
-        vybrany_zapas = st.selectbox("Vyber zápas", match_list[existing_column].tolist())
-    else:
-        st.error("Sloupec s názvem týmu nebyl nalezen.")
+   # if existing_column:
+    #    vybrany_zapas = st.selectbox("Vyber zápas", match_list[existing_column].tolist())
+    #else:
+    #    st.error("Sloupec s názvem týmu nebyl nalezen.")
 
     possible_column_names = ["Home_team - Away_team", "Home_team_Away_team"]
 
