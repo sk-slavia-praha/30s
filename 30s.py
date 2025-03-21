@@ -279,7 +279,7 @@ def main():
     #    raise KeyError("Sloupec s názvem týmu nebyl nalezen.")
     #vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
     #match_id = match_list[match_list["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
-    match_id = st.number_input("Zadej match_id", value=12580617)
+    match_id = st.number_input("Zadej match_id", value=12580637)
     #datum = "10.01.2025"
 
 
