@@ -252,34 +252,34 @@ def main():
     home_color="red"
     away_color = "blue"
     match_list = load_data()
-    #if not match_list.empty:
-    #    posledni_zapas_id = match_list["match_id"].iloc[-1]  # Poslední zápas jako defaultní
-    #else:
-    #    posledni_zapas_id = 0
+    if not match_list.empty:
+        posledni_zapas_id = match_list["match_id"].iloc[-1]  # Poslední zápas jako defaultní
+    else:
+        posledni_zapas_id = 0
 
     # Možnost vybrat zápas podle názvu
     possible_column_names = ["Home_team - Away_team", "Home_team_Away_team"]
 
     # Najdeme existující sloupec v datech
-    #existing_column = next((col for col in match_list.columns if col in possible_column_names), None)
+    existing_column = next((col for col in match_list.columns if col in possible_column_names), None)
 
-    #if existing_column:
-    #    vybrany_zapas = st.selectbox("Vyber zápas", match_list[existing_column].tolist())
-    #else:
-    #    st.error("Sloupec s názvem týmu nebyl nalezen.")
+    if existing_column:
+        vybrany_zapas = st.selectbox("Vyber zápas", match_list[existing_column].tolist())
+    else:
+        st.error("Sloupec s názvem týmu nebyl nalezen.")
 
     possible_column_names = ["Home_team - Away_team", "Home_team_Away_team"]
 
     # Najdeme existující sloupec v datech
-    #existing_column = next((col for col in possible_column_names if col in match_list.columns), None)
+    existing_column = next((col for col in possible_column_names if col in match_list.columns), None)
 
-    #if existing_column:
-    #    match_id = match_list[match_list[existing_column] == vybrany_zapas]["match_id"].values[0]
-    #else:
-    #    raise KeyError("Sloupec s názvem týmu nebyl nalezen.")
-    #vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
-    #match_id = match_list[match_list["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
-    match_id = st.number_input("Zadej match_id", value=12580637)
+    if existing_column:
+        match_id = match_list[match_list[existing_column] == vybrany_zapas]["match_id"].values[0]
+    else:
+        raise KeyError("Sloupec s názvem týmu nebyl nalezen.")
+    vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
+    match_id = match_list[match_list["Home_team - Away_team"] == vybrany_zapas]["match_id"].values[0]
+    #match_id = st.number_input("Zadej match_id", value=12580637)
     #datum = "10.01.2025"
 
 
