@@ -11,12 +11,12 @@ one_year_ago = datetime.date.today() - datetime.timedelta(days=365)
 csv_file_path = "all_matches.csv"  
 
 # 🏆 ID sledovaného týmu
-team_id_to_find = 2216  #2216
+team_id_to_find = 2216
 
 # 📥 Načtení existujícího souboru, pokud existuje
 if os.path.exists(csv_file_path):
     df_all_matches = pd.read_csv(csv_file_path)
-    df_all_matches["date"] = pd.to_datetime(df_all_matches["date"]).dt.date  # Převod na datumový formát
+    df_all_matches["date"] = pd.to_datetime(df_all_matches["date"]).dt.date
 else:
     df_all_matches = pd.DataFrame(columns=["match_id", "date", "home_team", "home_team_id", "away_team", "away_team_id"])
 
@@ -29,7 +29,7 @@ try:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
     }
     response = requests.get(url, headers=headers)
-    response = requests.get(url)
+    
     if response.status_code == 200:
         data = response.json()
         events = data.get("events", [])
@@ -43,19 +43,15 @@ try:
             away_team = event["awayTeam"]["name"] if "awayTeam" in event else "N/A"
             away_team_id = event["awayTeam"]["id"] if "awayTeam" in event else "N/A"
 
-            # 🎯 Uložit pouze zápasy, kde hraje sledovaný tým
             if home_team_id == team_id_to_find or away_team_id == team_id_to_find:
                 new_matches.append([match_id, match_date, home_team, home_team_id, away_team, away_team_id])
 
-        # 📊 Přidání nových zápasů a odstranění duplikátů
         df_new_matches = pd.DataFrame(new_matches, columns=["match_id", "date", "home_team", "home_team_id", "away_team", "away_team_id"])
         df_all_matches = pd.concat([df_all_matches, df_new_matches]).drop_duplicates("match_id")
-        df_all_matches = df_all_matches.sort_values(by='date',ascending=False)
+        df_all_matches = df_all_matches.sort_values(by='date', ascending=False)
         df_all_matches["Home_team - Away_team"] = df_all_matches["home_team"] + " - " + df_all_matches["away_team"]
-        # 🔍 Filtr na posledních 365 dní
         df_all_matches = df_all_matches[df_all_matches["date"] >= one_year_ago]
 
-        # 💾 Uložení aktualizovaných dat zpět do CSV
         df_all_matches.to_csv(csv_file_path, index=False, encoding="utf-8")
         print(f"✅ Data byla aktualizována a uložena do {csv_file_path}")
 
