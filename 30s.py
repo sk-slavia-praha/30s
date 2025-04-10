@@ -255,10 +255,10 @@ def main():
     #if not match_list.empty:
     #    posledni_zapas_id = match_list["match_id"].iloc[-1]  # Poslední zápas jako defaultní
     #else:
-        posledni_zapas_id = 0
+    #    posledni_zapas_id = 0
 
     # Vyber zápas
-    vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
+    #vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
 
     # Ošetření možných názvů sloupců
     #possible_column_names = ["Home_team - Away_team", "Home_team_Away_team"]
