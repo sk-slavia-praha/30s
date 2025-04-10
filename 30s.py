@@ -251,24 +251,24 @@ def main():
     count = st_autorefresh(interval=60000, limit=None, key="fizzbuzzcounter")
     home_color="red"
     away_color = "blue"
-    match_list = load_data()
-    if not match_list.empty:
-        posledni_zapas_id = match_list["match_id"].iloc[-1]  # Poslední zápas jako defaultní
-    else:
+    #match_list = load_data()
+    #if not match_list.empty:
+    #    posledni_zapas_id = match_list["match_id"].iloc[-1]  # Poslední zápas jako defaultní
+    #else:
         posledni_zapas_id = 0
 
     # Vyber zápas
     vybrany_zapas = st.selectbox("Vyber zápas", match_list["Home_team - Away_team"].tolist())
 
     # Ošetření možných názvů sloupců
-    possible_column_names = ["Home_team - Away_team", "Home_team_Away_team"]
-    existing_column = next((col for col in possible_column_names if col in match_list.columns), None)
+    #possible_column_names = ["Home_team - Away_team", "Home_team_Away_team"]
+    #existing_column = next((col for col in possible_column_names if col in match_list.columns), None)
 
-    if existing_column:
-        match_id = match_list[match_list[existing_column] == vybrany_zapas]["match_id"].values[0]
-    else:
-        raise KeyError("Sloupec s názvem týmu nebyl nalezen.")
-    match_id = 12499137
+    #if existing_column:
+    #     match_id = match_list[match_list[existing_column] == vybrany_zapas]["match_id"].values[0]
+    #else:
+    #    raise KeyError("Sloupec s názvem týmu nebyl nalezen.")
+    match_id = st.selectbox("Vyber zápas", options=[12580669])
 
     # -----------------------------------------------------------------------------
     # 1) Stažení JSONu pro momentum
