@@ -31,8 +31,7 @@ import matplotlib.patheffects as path_effects
 #chrome_options.add_argument('--disable-dev-shm-usage')
 
 options = uc.ChromeOptions()
-options.add_argument("--headless")  # nebo .headless = True
-driver = uc.Chrome(options=options)
+driver = uc.Chrome()
 
 # -----------------------------------------------------------------------------
 # Stahování fontů (nahrazuje "!wget" příkaz)
