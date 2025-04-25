@@ -1,6 +1,7 @@
 streamlit==1.31.1
 streamlit-autorefresh
 selenium
+undetected-chromedriver
 pandas
 requests
 matplotlib
