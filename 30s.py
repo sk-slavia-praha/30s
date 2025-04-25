@@ -281,7 +281,7 @@ def main():
     # -----------------------------------------------------------------------------
     url_momentum = f"https://www.sofascore.com/api/v1/event/{match_id}/graph"
     #driver = webdriver.Chrome(options=chrome_options)
-    driver = uc.Chrome(options=options)
+    driver = uc.Chrome()
     try:
         driver.get(url_momentum)
         pre_element = driver.find_element(By.TAG_NAME, 'pre')
