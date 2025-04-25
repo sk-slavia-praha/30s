@@ -15,6 +15,7 @@ from streamlit_autorefresh import st_autorefresh
 from collections import Counter
 
 # -- Selenium
+import undetected_chromedriver as uc
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import matplotlib.font_manager as font_manager
@@ -22,10 +23,14 @@ from matplotlib.colors import to_rgba
 import matplotlib.patheffects as path_effects
 
 # Nastavení pro běh Chromedriveru (bez GUI)
-chrome_options = webdriver.ChromeOptions()
-chrome_options.add_argument('--headless')
-chrome_options.add_argument('--no-sandbox')
-chrome_options.add_argument('--disable-dev-shm-usage')
+#chrome_options = webdriver.ChromeOptions()
+#chrome_options.add_argument('--headless')
+#chrome_options.add_argument('--no-sandbox')
+#chrome_options.add_argument('--disable-dev-shm-usage')
+
+options = uc.ChromeOptions()
+options.headless = True
+driver = uc.Chrome(options=options)
 
 # -----------------------------------------------------------------------------
 # Stahování fontů (nahrazuje "!wget" příkaz)
@@ -274,7 +279,8 @@ def main():
     # 1) Stažení JSONu pro momentum
     # -----------------------------------------------------------------------------
     url_momentum = f"https://www.sofascore.com/api/v1/event/{match_id}/graph"
-    driver = webdriver.Chrome(options=chrome_options)
+    #driver = webdriver.Chrome(options=chrome_options)
+    driver = uc.Chrome(options=options)
     try:
         driver.get(url_momentum)
         pre_element = driver.find_element(By.TAG_NAME, 'pre')
