@@ -16,6 +16,8 @@ from collections import Counter
 
 # -- Selenium
 import undetected_chromedriver as uc
+from distutils.version import LooseVersion
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import matplotlib.font_manager as font_manager
@@ -29,7 +31,7 @@ import matplotlib.patheffects as path_effects
 #chrome_options.add_argument('--disable-dev-shm-usage')
 
 options = uc.ChromeOptions()
-options.headless = True
+options.add_argument("--headless")  # nebo .headless = True
 driver = uc.Chrome(options=options)
 
 # -----------------------------------------------------------------------------
