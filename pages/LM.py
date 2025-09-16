@@ -1,6 +1,6 @@
-
 import time
 import json
+import base64
 import shutil
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ from mplsoccer import VerticalPitch
 
 
 # =========================
-# Selenium setup – Chromium
+# Selenium (Chromium) setup
 # =========================
 def make_driver():
     chrome_options = ChromeOptions()
@@ -30,6 +30,10 @@ def make_driver():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
+    # allow perf logging
+    chrome_prefs = {"download.default_directory": "/tmp"}
+    chrome_options.experimental_options["prefs"] = chrome_prefs
+    chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
     # Prefer common Chromium paths
     for binary in ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]:
@@ -43,134 +47,167 @@ def make_driver():
     return driver
 
 
-def wait_ready(driver, timeout=20):
+def wait_ready(driver, timeout=25):
     WebDriverWait(driver, timeout).until(
         lambda d: d.execute_script("return document.readyState") == "complete"
     )
 
 
-def extract_whoscored_json_from_scripts(driver):
-    """
-    Projde všechny <script> tagy a pokusí se najít velký JSON obsahující 'matchId' a 'events'.
-    Používá párování složených závorek, aby vytáhla validní JSON blok.
-    """
+# =========================
+# Robust data extraction
+# =========================
+def extract_json_from_scripts(driver):
+    """Scan all <script> tags for a big JSON blob containing 'events' and 'matchId'."""
     scripts = driver.find_elements(By.TAG_NAME, "script")
     for s in scripts:
         try:
             txt = s.get_attribute("innerHTML") or ""
         except Exception:
             continue
-        if ("matchId" not in txt) or ("events" not in txt):
+        if ("events" not in txt) or ("matchId" not in txt):
             continue
-
-        # Heuristicky projdeme text a pokusíme se vyseknout JSON bloky pomocí párování závorek
-        opens = [i for i, ch in enumerate(txt) if ch == "{"]
-        closes = [i for i, ch in enumerate(txt) if ch == "}"]
-        # rychlý ořez – nechceme obří script bez důvodu
-        if len(opens) == 0 or len(closes) == 0:
-            continue
-
-        # Pojďme skenovat od každé '{' a zkusit najít matching '}' s counterem
+        # Brace-matching to carve a JSON object
         n = len(txt)
-        for start in opens:
+        for i, ch in enumerate(txt):
+            if ch != "{":
+                continue
             depth = 0
-            for end in range(start, n):
-                c = txt[end]
-                if c == "{":
+            for j in range(i, n):
+                if txt[j] == "{":
                     depth += 1
-                elif c == "}":
+                elif txt[j] == "}":
                     depth -= 1
                     if depth == 0:
-                        candidate = txt[start:end+1].strip()
-                        # rychlé sanity checky
-                        if '"events"' not in candidate or '"matchId"' not in candidate:
-                            continue
-                        # někdy je za JSONem čárka/semicolon – to odstraníme už výběrem [start:end+1]
-                        try:
-                            obj = json.loads(candidate)
-                            # očekáváme dict s 'events'
-                            if isinstance(obj, dict) and "events" in obj:
-                                return obj
-                        except Exception:
-                            pass
-                        break  # ukonči vnitřní end-loop a zkus další start
-    raise ValueError("Nepodařilo se najít JSON s událostmi v žádném <script>.")
+                        cand = txt[i:j+1]
+                        if '"events"' in cand and '"matchId"' in cand:
+                            try:
+                                return json.loads(cand)
+                            except Exception:
+                                pass
+                        break
+    raise ValueError("JSON ve <script> nenalezen")
 
 
-# =========================
-# Načtení a parsování zápasu (bez převodu souřadnic)
-# =========================
-def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dict):
+def extract_json_from_network(driver, collect_seconds=6):
+    """Use Chrome DevTools Protocol via Selenium to capture XHR/fetch JSON bodies."""
+    # Enable Network
+    driver.execute_cdp_cmd("Network.enable", {})
+    start = time.time()
+    seen_request_ids = set()
+    candidates = []
+
+    while time.time() - start < collect_seconds:
+        logs = driver.get_log("performance")
+        for entry in logs:
+            try:
+                msg = json.loads(entry["message"])["message"]
+            except Exception:
+                continue
+            method = msg.get("method", "")
+            params = msg.get("params", {})
+
+            if method == "Network.responseReceived":
+                resp = params.get("response", {})
+                url = resp.get("url", "")
+                mime = resp.get("mimeType", "")
+                req_id = params.get("requestId")
+                if not req_id or req_id in seen_request_ids:
+                    continue
+                # Filter to JSON-ish responses from whoscored endpoints
+                if ("whoscored" in url.lower()) and ("json" in mime or "javascript" in mime or "text/plain" in mime):
+                    seen_request_ids.add(req_id)
+                    candidates.append((req_id, url, mime))
+
+        time.sleep(0.3)
+
+    # Try to fetch bodies
+    for req_id, url, mime in candidates:
+        try:
+            body_res = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": req_id})
+            body = body_res.get("body", "")
+            if body_res.get("base64Encoded"):
+                body = base64.b64decode(body).decode("utf-8", errors="ignore")
+            # Some endpoints return JSON as text/plain
+            # Try JSON parse directly; if fails, try to locate a JSON object with 'events'
+            try:
+                obj = json.loads(body)
+                if isinstance(obj, dict) and "events" in obj and "matchId" in obj:
+                    return obj
+                # Sometimes nested under e.g. obj['matchCentreData']
+                for k, v in obj.items() if isinstance(obj, dict) else []:
+                    if isinstance(v, dict) and "events" in v and "matchId" in v:
+                        return v
+            except Exception:
+                # Fallback: scan for the largest JSON object containing 'events'
+                best = ""
+                for idx in [i for i, ch in enumerate(body) if ch == "{"]:
+                    depth = 0
+                    for j in range(idx, len(body)):
+                        c = body[j]
+                        if c == "{":
+                            depth += 1
+                        elif c == "}":
+                            depth -= 1
+                            if depth == 0:
+                                cand = body[idx:j+1]
+                                if '"events"' in cand and '"matchId"' in cand and len(cand) > len(best):
+                                    best = cand
+                                break
+                if best:
+                    try:
+                        return json.loads(best)
+                    except Exception:
+                        pass
+        except Exception:
+            continue
+
+    raise RuntimeError("Network log pro JSON s událostmi nenašel vhodné tělo odpovědi.")
+
+
+def get_events_json(match_url: str):
     driver = make_driver()
     try:
+        # Enable Network before navigation to capture early XHRs
+        driver.execute_cdp_cmd("Network.enable", {})
         driver.get(match_url)
-        wait_ready(driver, timeout=25)
-        # Malé čekání na hydrataci
-        time.sleep(2)
-    except WebDriverException:
-        driver.get(match_url)
-        wait_ready(driver, timeout=25)
+        wait_ready(driver, 25)
         time.sleep(2)
 
-    try:
-        data = extract_whoscored_json_from_scripts(driver)
-    except Exception as e:
-        # Fallback: zkusíme HTML zdroj (někdy Selenium nevidí innerHTML)
-        page = driver.page_source
-        # zkusíme jednodušší heuristiku – vyndat největší JSON blok s "events"
-        best = ""
-        if "events" in page and "matchId" in page:
-            # oříznem stranu do ~500k znaků kolem "events"
-            idx = page.find("events")
-            start = max(0, idx - 200000)
-            end = min(len(page), idx + 200000)
-            snippet = page[start:end]
-            # opět párování závorek
-            opens = [i for i, ch in enumerate(snippet) if ch == "{"]
-            n = len(snippet)
-            for st in opens:
-                depth = 0
-                for en in range(st, n):
-                    ch = snippet[en]
-                    if ch == "{":
-                        depth += 1
-                    elif ch == "}":
-                        depth -= 1
-                        if depth == 0:
-                            cand = snippet[st:en+1]
-                            if '"events"' in cand and '"matchId"' in cand and len(cand) > len(best):
-                                best = cand
-                            break
-            if best:
-                try:
-                    data = json.loads(best)
-                except Exception as e2:
-                    driver.quit()
-                    raise RuntimeError(f"Nepodařilo se rozparsovat JSON z page_source: {e2}") from e2
+        # 1) Try inline scripts
+        try:
+            data = extract_json_from_scripts(driver)
+        except Exception:
+            # 2) Try network capture
+            data = extract_json_from_network(driver, collect_seconds=8)
+
+        # Supplementary info
+        try:
+            region = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/span[1]').text
+        except NoSuchElementException:
+            region = ""
+        try:
+            league_season = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/a').text
+            if " - " in league_season:
+                league, season = league_season.split(" - ", 1)
             else:
-                driver.quit()
-                raise RuntimeError(f"JSON nenalezen (fallback). Původní chyba: {e}")
-        else:
-            driver.quit()
-            raise RuntimeError(f"JSON nenalezen ve skriptech ani v page_source. Původní chyba: {e}")
+                league, season = league_season, ""
+        except NoSuchElementException:
+            league, season = "", ""
 
-    # Doplňkové info
-    try:
-        region = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/span[1]').text
-    except NoSuchElementException:
-        region = ""
-    try:
-        league_season = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/a').text
-        if " - " in league_season:
-            league, season = league_season.split(" - ", 1)
-        else:
-            league, season = league_season, ""
-    except NoSuchElementException:
-        league, season = "", ""
+    finally:
+        driver.quit()
 
-    driver.quit()
+    return data, {"region": region, "league": league, "season": season}
 
+
+# =========================
+# Parse → DataFrame (no coordinate conversion, use WS 0..100)
+# =========================
+def to_events_df(data: dict, extra_meta: dict) -> (pd.DataFrame, dict):
     events = data.get("events", [])
+    home = data.get("home", {}) or data.get("homeTeam", {})
+    away = data.get("away", {}) or data.get("awayTeam", {})
+
     for e in events:
         e.update({
             "matchId": data.get("matchId"),
@@ -182,16 +219,26 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
             "etScore": data.get("etScore"),
             "venueName": data.get("venueName"),
             "maxMinute": data.get("maxMinute"),
-            "region": region,
-            "league": league,
-            "season": season,
+            "region": extra_meta.get("region", ""),
+            "league": extra_meta.get("league", ""),
+            "season": extra_meta.get("season", ""),
         })
 
     df = pd.DataFrame(events)
-    if df.empty:
-        return df, data
+    meta = {
+        "home": home,
+        "away": away,
+        "matchId": data.get("matchId"),
+        "startDate": data.get("startDate"),
+        "score": data.get("score"),
+        "league": extra_meta.get("league", ""),
+        "season": extra_meta.get("season", ""),
+    }
 
-    # Zploštění
+    if df.empty:
+        return df, meta
+
+    # Flatten
     if "period" in df:
         df["period"] = pd.json_normalize(df["period"])["displayName"]
     if "type" in df:
@@ -212,29 +259,32 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
     except Exception:
         df["cardType"] = False
 
+    # Names / teams
     df["playerId"] = df.get("playerId", pd.Series(index=df.index)).fillna(-1).astype(int).astype(str)
     id_name_map = data.get("playerIdNameDictionary", {})
     df["playerName"] = df["playerId"].map(id_name_map)
 
-    home_tid = data.get("home", {}).get("teamId")
-    away_tid = data.get("away", {}).get("teamId")
+    home_tid = home.get("teamId")
+    away_tid = away.get("teamId")
     df["h_a"] = df["teamId"].map({home_tid: "h", away_tid: "a"})
     team_id_to_name = {
-        home_tid: data.get("home", {}).get("name"),
-        away_tid: data.get("away", {}).get("name"),
+        home_tid: home.get("name"),
+        away_tid: away.get("name"),
     }
     df["squadName"] = df["teamId"].map(team_id_to_name)
 
-    # Flagy v 0..100 prostoru
+    # Flags in 0..100 space
     df["final_third_start"] = (df["x"] <= 66.7).astype(int)
     df["final_third_end"] = (df["endX"] > 66.7).astype(int)
-
     df["penaltyBox"] = ((df["x"] >= 84.3) & (np.abs(df["y"] - 50) <= 29.65)).astype(int)
     df["penaltyBox_end"] = ((df["endX"] >= 84.3) & (np.abs(df["endY"] - 50) <= 29.65)).astype(int)
 
-    return df, data
+    return df, meta
 
 
+# =========================
+# Vizualizace (stejné jako dříve)
+# =========================
 def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
     pitch = VerticalPitch(pitch_type="custom", pitch_length=100, pitch_width=100,
                           pitch_color="w",
@@ -343,22 +393,23 @@ def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
 # =========================
 # Streamlit UI
 # =========================
-st.set_page_config(page_title="WhoScored → Entries Viz (Chromium, robustní parser)", layout="wide")
+st.set_page_config(page_title="WhoScored → Entries Viz (Chromium + CDP)", layout="wide")
 st.title("Vstupy do F3 a do vápna – WhoScored scraper → vizualizace (Chromium, bez převodu souřadnic)")
 
 default_url = "https://1xbet.whoscored.com/matches/1874065/live/international-world-cup-qualification-uefa-2025-2026-montenegro-czechia"
 match_url = st.text_input("Vlož URL zápasu z 1xbet.whoscored.com", value=default_url)
 
-col_go, col_info = st.columns([1, 3])
+col_go, col_dbg = st.columns([1, 3])
 with col_go:
     go = st.button("Načíst a vykreslit", type="primary")
-with col_info:
-    st.caption("Appka prochází všechny <script> tagy a robustně hledá JSON ('events', 'matchId'). Očekává 'chromium' a 'chromium-driver'.")
+with col_dbg:
+    st.caption("Appka nejprve zkouší inline skripty, když selžou, chytá JSON přes Chrome DevTools (Network).")
 
 if go and match_url:
     with st.spinner("Stahuji a zpracovávám data…"):
         try:
-            events_df, meta = get_events_df_from_url_with_qualifiers(match_url)
+            raw_data, extra = get_events_json(match_url)
+            events_df, meta = to_events_df(raw_data, extra)
         except Exception as e:
             st.error(f"Chyba při načítání: {e}")
             st.stop()
@@ -415,5 +466,9 @@ if go and match_url:
 
     csv_bytes = events_df.to_csv(index=False).encode("utf-8")
     st.download_button("Stáhnout events.csv", data=csv_bytes, file_name="events.csv", mime="text/csv")
+
+    # Debug download raw JSON
+    st.download_button("Stáhnout raw JSON", data=json.dumps(raw_data, ensure_ascii=False, indent=2),
+                       file_name="whoscored_raw.json", mime="application/json")
 else:
     st.info("Zadej URL a klikni na **Načíst a vykreslit**.")
