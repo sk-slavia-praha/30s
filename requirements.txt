@@ -5,3 +5,6 @@ pandas
 requests
 matplotlib
 pillow
+geckodriver-autoinstaller==0.1.0
+numpy==1.26.4
+mplsoccer==1.2.4
