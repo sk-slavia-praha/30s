@@ -1,12 +1,4 @@
-# Streamlit aplikace (Chromium, bez převodu souřadnic)
 
-Níže jsou tři soubory: `app.py`, `requirements.txt` a `packages.txt`. Nahraj je do GitHub repozitáře (root) a ve Streamlit Cloud nastav entrypoint na `app.py`.
-
----
-
-## app.py
-
-```python
 import os
 import time
 import json
