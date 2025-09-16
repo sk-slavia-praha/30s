@@ -383,6 +383,5 @@ if go and match_url:
     st.download_button("Stáhnout events.csv", data=csv_bytes, file_name="events.csv", mime="text/csv")
 else:
     st.info("Zadej URL a klikni na **Načíst a vykreslit**.")
-```
 
 
