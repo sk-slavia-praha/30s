@@ -1,17 +1,17 @@
-import os
+
 import time
 import json
-import ast
-import math
+import shutil
 import numpy as np
 import pandas as pd
 import streamlit as st
-import geckodriver_autoinstaller
 
 from collections import OrderedDict
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import WebDriverException, NoSuchElementException
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, Normalize
@@ -19,71 +19,51 @@ from mplsoccer import VerticalPitch
 
 
 # =========================
-# Selenium setup (Firefox)
+# Selenium setup – prefer Chromium
+#   - expects chromium + chromedriver available in the system (PATH)
+#   - typical Streamlit Cloud setup via packages.txt:
+#       chromium
+#       chromium-driver
 # =========================
 def make_driver():
-    # Autoinstalace geckodriveru (správná verze dle Firefoxu v prostředí)
-    geckodriver_autoinstaller.install()
-    options = webdriver.FirefoxOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    # V některých prostředích pomůže nastavit binárku, pokud je Firefox jinde:
-    # options.binary_location = "/usr/bin/firefox"
-    driver = webdriver.Firefox(options=options)
+    chrome_options = ChromeOptions()
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    # Try common Chromium binary locations if needed
+    for binary in ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]:
+        if shutil.which(binary):
+            chrome_options.binary_location = binary
+            break
+
+    # Use chromedriver from PATH
+    chromedriver_path = shutil.which("chromedriver") or shutil.which("chromium-driver") or "chromedriver"
+    service = ChromeService(executable_path=chromedriver_path)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
 
 # =========================
-# Utility – koordinátové transformace do "impect" prostoru
-# X:  -52.5 ... 52.5  (0 je střed hřiště; 52.5 = soupeřova branková čára)
-# Y:  -34   ... 34    (0 je střed šířky hřiště; +nahoru, -dolů)
-# =========================
-def ws_to_impect_xy(x, y):
-    """
-    WhoScored typicky používá rozsah 0..100 v obou osách.
-    Zde mapujeme na rozměry 105 x 68 m a posouváme tak, aby střed byl (0, 0).
-    """
-    if pd.isna(x) or pd.isna(y):
-        return np.nan, np.nan
-    # X: 0..100 -> 0..105 (m), pak -52.5..52.5
-    x_m = (x / 100.0) * 105.0 - 52.5
-    # Y: 0..100 -> -34..34, 0 nahoře -> +34 nahoře (invert)
-    y_m = (50.0 - y) / 100.0 * 68.0
-    return x_m, y_m
-
-
-def point_in_penalty_box(x, y):
-    """
-    Penalta v impect prostoru na útočné straně (pravé – x > 0):
-      - vzdálenost od brankové čáry v metrech = 16.5 (tedy x > 52.5-16.5 = 36.0)
-      - šířka = 40.32 m -> |y| <= 40.32/2 = 20.16
-    """
-    if pd.isna(x) or pd.isna(y):
-        return False
-    return (x >= 36.0) and (abs(y) <= 20.16)
-
-
-# =========================
-# Načtení a parsování zápasu z WhoScored
+# Načtení a parsování zápasu z WhoScored 1xbet mirroru
+# Bez převodu souřadnic: používáme WS 0..100 pro x i y
 # =========================
 def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dict):
     driver = make_driver()
     try:
         driver.get(match_url)
     except WebDriverException:
-        # One retry
         driver.get(match_url)
     time.sleep(5)
 
-    # Najdeme první inline <script> s JSONem (WhoScored 1xbet mirror)
     script_el = driver.find_element(By.XPATH, '//*[@id="layout-wrapper"]/script[1]')
     script = script_el.get_attribute('innerHTML').strip().replace('\\n', '').replace('\\t', '')
 
-    # Vyřízneme část objektu
     script = script[script.index("matchId"):script.rindex("}")]
     parts = list(filter(None, script.split(',            ')))
-    metadata = json.loads(parts[1][parts[1].index('{'):])  # první větší objekt
+    metadata = json.loads(parts[1][parts[1].index('{'):])  # první JSON objekt
     keys = [p.split(':')[0].strip() for p in parts]
     values = [p.split(':', 1)[1].strip() for p in parts]
     for k, v in zip(keys, values):
@@ -95,7 +75,7 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
 
     data = dict(OrderedDict(sorted(metadata.items())))
 
-    # Doplňkové info z breadcrumbs (když je dostupné)
+    # Doplnění kontextu (nepovinné)
     try:
         region = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/span[1]').text
     except NoSuchElementException:
@@ -111,7 +91,6 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
 
     driver.quit()
 
-    # Rozšíření každé události o základní metadata
     events = data.get("events", [])
     for e in events:
         e.update({
@@ -133,7 +112,7 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
     if df.empty:
         return df, data
 
-    # Zploštění vybraných vnořených struktur
+    # Zploštění
     if "period" in df:
         df["period"] = pd.json_normalize(df["period"])["displayName"]
     if "type" in df:
@@ -145,21 +124,20 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
     else:
         df["outcomeType"] = np.nan
 
-    # Výsledek na SUCCESS/FAIL (když není k dispozici, necháme NaN)
     df["result"] = np.where(df["outcomeType"].str.lower().eq("successful"), "SUCCESS",
                             np.where(df["outcomeType"].isna(), np.nan, "FAIL"))
 
-    # Kartičky (bezpečné rozbalení)
     try:
         x = df["cardType"].fillna({i: {} for i in df.index})
         df["cardType"] = pd.json_normalize(x)["displayName"].fillna(False)
     except Exception:
         df["cardType"] = False
 
-    # Jména hráčů + domácí/hosté (h/a)
+    # Jména / týmy
     df["playerId"] = df.get("playerId", pd.Series(index=df.index)).fillna(-1).astype(int).astype(str)
     id_name_map = data.get("playerIdNameDictionary", {})
     df["playerName"] = df["playerId"].map(id_name_map)
+
     home_tid = data.get("home", {}).get("teamId")
     away_tid = data.get("away", {}).get("teamId")
     df["h_a"] = df["teamId"].map({home_tid: "h", away_tid: "a"})
@@ -169,69 +147,61 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
     }
     df["squadName"] = df["teamId"].map(team_id_to_name)
 
-    # Koordináty – start a end do impect prostoru
-    for col_pair in [("x", "y", "startAdjCoordinatesX", "startAdjCoordinatesY"),
-                     ("endX", "endY", "endAdjCoordinatesX", "endAdjCoordinatesY")]:
-        src_x, src_y, dst_x, dst_y = col_pair
-        if src_x in df.columns and src_y in df.columns:
-            impect_xy = df[[src_x, src_y]].apply(lambda s: ws_to_impect_xy(s[src_x], s[src_y]), axis=1, result_type="expand")
-            impect_xy.columns = [dst_x, dst_y]
-            df[[dst_x, dst_y]] = impect_xy
-        else:
-            df[dst_x] = np.nan
-            df[dst_y] = np.nan
+    # =========================
+    # Pomocné flagy (bez převodu souřadnic, přímo v WS 0..100)
+    # final third = x > 66.7 (poslední třetina)
+    # penalta (útočná) ~ endX >= 84.3 a |endY-50| <= 29.65
+    # =========================
+    df["final_third_start"] = (df["x"] <= 66.7).astype(int)
+    df["final_third_end"] = (df["endX"] > 66.7).astype(int)
 
-    # Penalta flags (start/end) podle impect souřadnic na útočné straně
-    df["penaltyBox"] = df[["startAdjCoordinatesX", "startAdjCoordinatesY"]].apply(lambda r: point_in_penalty_box(r[0], r[1]), axis=1).astype(int)
-    df["penaltyBox_end"] = df[["endAdjCoordinatesX", "endAdjCoordinatesY"]].apply(lambda r: point_in_penalty_box(r[0], r[1]), axis=1).astype(int)
+    df["penaltyBox"] = ((df["x"] >= 84.3) & (np.abs(df["y"] - 50) <= 29.65)).astype(int)
+    df["penaltyBox_end"] = ((df["endX"] >= 84.3) & (np.abs(df["endY"] - 50) <= 29.65)).astype(int)
 
     return df, data
 
 
 # =========================
-# Vizualizace – Entry do F3 (přechod do útočné třetiny)
+# Vizualizace – Entries do poslední třetiny
 # =========================
-def plot_f3_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
-    pitch = VerticalPitch(pitch_type="impect", pitch_color="w",
+def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
+    pitch = VerticalPitch(pitch_type="custom", pitch_length=100, pitch_width=100,
+                          pitch_color="w",
                           line_color=textcolor, linewidth=2, line_zorder=2, line_alpha=0.2, goal_alpha=0.2)
     pitch.draw(ax=ax)
-
-    # Styling pozadí
     ax.set_facecolor(facecolor)
 
-    # Filtry: jen PASS/DRIBBLE, SUCCESS, přechod do F3 (x z <=17.5 do >17.5)
     mask = (
         df_team["actionType"].isin(["Pass", "Dribble"])) & \
         (df_team["result"] == "SUCCESS") & \
-        (df_team["startAdjCoordinatesX"] <= 17.5) & (df_team["endAdjCoordinatesX"] > 17.5)
+        (df_team["x"] <= 66.7) & (df_team["endX"] > 66.7)
     sub = df_team.loc[mask].copy()
 
-    # Čáry + koncové body
-    pitch.lines(sub["startAdjCoordinatesX"], sub["startAdjCoordinatesY"],
-                sub["endAdjCoordinatesX"], sub["endAdjCoordinatesY"],
+    pitch.lines(sub["x"], sub["y"],
+                sub["endX"], sub["endY"],
                 linestyle="--", ax=ax, lw=1.8, zorder=2)
-    pitch.scatter(sub["endAdjCoordinatesX"], sub["endAdjCoordinatesY"], zorder=3,
+    pitch.scatter(sub["endX"], sub["endY"], zorder=3,
                   s=40, edgecolors="#000000", marker="o", ax=ax)
 
-    # Rozdělení do pěti zón podle Y v F3
+    # Zóny finální třetiny
     def zone_from_y(y):
-        if y <= 34 and y > 20.16:
+        if 0 <= y <= 20:
             return "Zone 1"
-        if y <= 20.16 and y > 9.16:
+        if 20 < y <= 40:
             return "Zone 2"
-        if y <= 9.16 and y >= -9.16:
+        if 40 < y <= 60:
             return "Zone 3"
-        if y < -9.16 and y >= -20.16:
+        if 60 < y <= 80:
             return "Zone 4"
-        if y < -20.16 and y >= -34:
+        if 80 < y <= 100:
             return "Zone 5"
         return np.nan
 
-    sub = sub[sub["endAdjCoordinatesX"] > 17.5].copy()
-    sub["Fifth"] = sub["endAdjCoordinatesY"].apply(zone_from_y)
+    sub = sub[sub["endX"] > 66.7].copy()
+    sub["Fifth"] = sub["endY"].apply(zone_from_y)
     fifth = sub.groupby("Fifth", dropna=True).agg(
         counts=("actionType", "count"),
-        gpa=("PXT_PASS", "mean")  # pokud sloupec není, bude NaN
+        gpa=("PXT_PASS", "mean")
     ).reset_index()
 
     if fifth.empty:
@@ -239,24 +209,21 @@ def plot_f3_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
 
     fifth["percentage"] = fifth["counts"] / fifth["counts"].sum() * 100.0
 
-    # Sloupky podél středové čáry (jako v ukázce)
     bar_widths = [12, 8, 12, 8, 12]
-    x_pos = [27, 14, 0, -14, -27]
+    x_pos = [80, 74, 68, 62, 56]
 
-    # Barevná mapa dle gpa (pokud NaN, dáme střed)
     vmin = np.nanmin(fifth["gpa"].values) if not np.all(np.isnan(fifth["gpa"].values)) else 0.0
     vmax = np.nanmax(fifth["gpa"].values) if not np.all(np.isnan(fifth["gpa"].values)) else 1.0
     cmap = LinearSegmentedColormap.from_list("", [facecolor, "#d00000"], N=5000)
     norm = Normalize(vmin=vmin, vmax=vmax)
 
-    # Mapování pořadí zón -> osy
     order = ["Zone 1", "Zone 2", "Zone 3", "Zone 4", "Zone 5"]
     fifth = fifth.set_index("Fifth").reindex(order).fillna(0).reset_index()
 
     ax.bar(x_pos,
-           -fifth["percentage"] * 1.0,
+           -fifth["percentage"],
            width=bar_widths,
-           bottom=17.5,
+           bottom=66.7,
            align="center",
            color=cmap(norm(fifth["gpa"])),
            alpha=0.5,
@@ -264,43 +231,40 @@ def plot_f3_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
            ec="gray",
            linewidth=2)
 
-    # Popisky počtů na horní hraně sloupků
     counts = list(fifth["counts"])
-    for x, height, val in zip(x_pos, -fifth["percentage"] * 1.0 + 17.5, counts):
+    for x, height, val in zip(x_pos, -fifth["percentage"] + 66.7, counts):
         ax.text(x, height, str(int(val)), ha="center", va="bottom", fontsize=12, color=textcolor, alpha=1)
 
-    ax.axhline(y=17.5, c=textcolor, ls="-", lw=3, alpha=0.3, zorder=5)
+    ax.axhline(y=66.7, c=textcolor, ls="-", lw=3, alpha=0.3, zorder=5)
 
 
 # =========================
-# Vizualizace – Vstupy do vápna zvenčí + heatmapa
+# Vizualizace – Vstupy do vápna + heatmapa startů
 # =========================
 def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
-    pitch = VerticalPitch(pitch_type="impect", pitch_color=facecolor,
-                          pad_bottom=-52,
+    pitch = VerticalPitch(pitch_type="custom", pitch_length=100, pitch_width=100,
+                          pitch_color=facecolor,
+                          pad_bottom=-30,
                           line_color=textcolor, linewidth=2, line_zorder=2, line_alpha=0.2, goal_alpha=0.2)
     pitch.draw(ax=ax)
     ax.set_facecolor(facecolor)
 
-    # Vstupy do vápna: PASS/DRIBBLE, SUCCESS, start mimo box, konec uvnitř boxu
     mask = (
         df_team["actionType"].isin(["Pass", "Dribble"])) & \
         (df_team["result"] == "SUCCESS") & \
         (df_team["penaltyBox"] != 1) & (df_team["penaltyBox_end"] == 1)
     sub = df_team.loc[mask].copy()
 
-    # Čáry + koncové body
-    pitch.lines(sub["startAdjCoordinatesX"], sub["startAdjCoordinatesY"],
-                sub["endAdjCoordinatesX"], sub["endAdjCoordinatesY"],
+    pitch.lines(sub["x"], sub["y"],
+                sub["endX"], sub["endY"],
                 linestyle="-", ax=ax, lw=2.5, zorder=2)
-    pitch.scatter(sub["endAdjCoordinatesX"], sub["endAdjCoordinatesY"], zorder=3,
+    pitch.scatter(sub["endX"], sub["endY"], zorder=3,
                   s=70, edgecolors="#000000", marker="o", ax=ax)
 
-    # Heatmapa – pouze pro akce začínající na soupeřově polovině (start X >= 0), a končící ve vápně
-    filt = sub[sub["startAdjCoordinatesX"] >= 0]
+    filt = sub[sub["x"] >= 50]
     if not filt.empty:
         bin_stat = pitch.bin_statistic_positional(
-            filt["startAdjCoordinatesX"], filt["startAdjCoordinatesY"],
+            filt["x"], filt["y"],
             statistic="count", positional="full", normalize=False
         )
         cmap = LinearSegmentedColormap.from_list("", [facecolor, "#d00000"], N=1000)
@@ -312,8 +276,8 @@ def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
 # =========================
 # Streamlit UI
 # =========================
-st.set_page_config(page_title="WhoScored → Entries Viz", layout="wide")
-st.title("Vstupy do F3 a do vápna – WhoScored scraper → vizualizace")
+st.set_page_config(page_title="WhoScored → Entries Viz (Chromium, bez převodu)", layout="wide")
+st.title("Vstupy do F3 a do vápna – WhoScored scraper → vizualizace (Chromium, bez převodu souřadnic)")
 
 default_url = "https://1xbet.whoscored.com/matches/1874065/live/international-world-cup-qualification-uefa-2025-2026-montenegro-czechia"
 match_url = st.text_input("Vlož URL zápasu z 1xbet.whoscored.com", value=default_url)
@@ -322,7 +286,7 @@ col_go, col_info = st.columns([1, 3])
 with col_go:
     go = st.button("Načíst a vykreslit", type="primary")
 with col_info:
-    st.caption("Tip: Stránku musí být možné otevřít bez přihlášení. Skript používá Firefox v headless režimu a zkouší automaticky nainstalovat geckodriver.")
+    st.caption("Očekává se, že prostředí má nainstalováno 'chromium' a 'chromium-driver' (viz packages.txt).")
 
 if go and match_url:
     with st.spinner("Stahuji a zpracovávám data…"):
@@ -336,7 +300,6 @@ if go and match_url:
         st.warning("Pro tento zápas se nepodařilo načíst žádné události.")
         st.stop()
 
-    # Základní meta
     home = meta.get("home", {}).get("name", "Home")
     away = meta.get("away", {}).get("name", "Away")
     home_tid = meta.get("home", {}).get("teamId")
@@ -345,7 +308,6 @@ if go and match_url:
     st.subheader(f"{home} vs {away}")
     st.caption(f"Datum: {meta.get('startDate','')[:10]} | Skóre: {meta.get('score','')} | Liga: {meta.get('league','')} {meta.get('season','')}")
 
-    # Výběr týmů do sloupců – vlevo preferuj teamId 349, jinak home
     preferred_left_tid = 349
     if preferred_left_tid in (home_tid, away_tid):
         left_tid = preferred_left_tid
@@ -364,29 +326,26 @@ if go and match_url:
 
     c1, c2 = st.columns(2)
 
-    # --- Levý sloupec
     with c1:
         st.markdown(f"### {left_name}")
         fig1, ax1 = plt.subplots(figsize=(6, 4))
-        plot_f3_entries(ax1, left_df)
+        plot_final_third_entries(ax1, left_df)
         st.pyplot(fig1, clear_figure=True)
 
         fig2, ax2 = plt.subplots(figsize=(6, 4))
         plot_box_entries_heatmap(ax2, left_df)
         st.pyplot(fig2, clear_figure=True)
 
-    # --- Pravý sloupec
     with c2:
         st.markdown(f"### {right_name}")
         fig3, ax3 = plt.subplots(figsize=(6, 4))
-        plot_f3_entries(ax3, right_df)
+        plot_final_third_entries(ax3, right_df)
         st.pyplot(fig3, clear_figure=True)
 
         fig4, ax4 = plt.subplots(figsize=(6, 4))
         plot_box_entries_heatmap(ax4, right_df)
         st.pyplot(fig4, clear_figure=True)
 
-    # Ulož surová data ke stažení
     csv_bytes = events_df.to_csv(index=False).encode("utf-8")
     st.download_button("Stáhnout events.csv", data=csv_bytes, file_name="events.csv", mime="text/csv")
 else:
