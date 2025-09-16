@@ -9,7 +9,9 @@ import streamlit as st
 from collections import OrderedDict
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import WebDriverException, NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import WebDriverException, NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
 
@@ -19,11 +21,7 @@ from mplsoccer import VerticalPitch
 
 
 # =========================
-# Selenium setup – prefer Chromium
-#   - expects chromium + chromedriver available in the system (PATH)
-#   - typical Streamlit Cloud setup via packages.txt:
-#       chromium
-#       chromium-driver
+# Selenium setup – Chromium
 # =========================
 def make_driver():
     chrome_options = ChromeOptions()
@@ -33,49 +31,130 @@ def make_driver():
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
 
-    # Try common Chromium binary locations if needed
+    # Prefer common Chromium paths
     for binary in ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]:
         if shutil.which(binary):
             chrome_options.binary_location = binary
             break
 
-    # Use chromedriver from PATH
     chromedriver_path = shutil.which("chromedriver") or shutil.which("chromium-driver") or "chromedriver"
     service = ChromeService(executable_path=chromedriver_path)
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
 
+def wait_ready(driver, timeout=20):
+    WebDriverWait(driver, timeout).until(
+        lambda d: d.execute_script("return document.readyState") == "complete"
+    )
+
+
+def extract_whoscored_json_from_scripts(driver):
+    """
+    Projde všechny <script> tagy a pokusí se najít velký JSON obsahující 'matchId' a 'events'.
+    Používá párování složených závorek, aby vytáhla validní JSON blok.
+    """
+    scripts = driver.find_elements(By.TAG_NAME, "script")
+    for s in scripts:
+        try:
+            txt = s.get_attribute("innerHTML") or ""
+        except Exception:
+            continue
+        if ("matchId" not in txt) or ("events" not in txt):
+            continue
+
+        # Heuristicky projdeme text a pokusíme se vyseknout JSON bloky pomocí párování závorek
+        opens = [i for i, ch in enumerate(txt) if ch == "{"]
+        closes = [i for i, ch in enumerate(txt) if ch == "}"]
+        # rychlý ořez – nechceme obří script bez důvodu
+        if len(opens) == 0 or len(closes) == 0:
+            continue
+
+        # Pojďme skenovat od každé '{' a zkusit najít matching '}' s counterem
+        n = len(txt)
+        for start in opens:
+            depth = 0
+            for end in range(start, n):
+                c = txt[end]
+                if c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
+                    if depth == 0:
+                        candidate = txt[start:end+1].strip()
+                        # rychlé sanity checky
+                        if '"events"' not in candidate or '"matchId"' not in candidate:
+                            continue
+                        # někdy je za JSONem čárka/semicolon – to odstraníme už výběrem [start:end+1]
+                        try:
+                            obj = json.loads(candidate)
+                            # očekáváme dict s 'events'
+                            if isinstance(obj, dict) and "events" in obj:
+                                return obj
+                        except Exception:
+                            pass
+                        break  # ukonči vnitřní end-loop a zkus další start
+    raise ValueError("Nepodařilo se najít JSON s událostmi v žádném <script>.")
+
+
 # =========================
-# Načtení a parsování zápasu z WhoScored 1xbet mirroru
-# Bez převodu souřadnic: používáme WS 0..100 pro x i y
+# Načtení a parsování zápasu (bez převodu souřadnic)
 # =========================
 def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dict):
     driver = make_driver()
     try:
         driver.get(match_url)
+        wait_ready(driver, timeout=25)
+        # Malé čekání na hydrataci
+        time.sleep(2)
     except WebDriverException:
         driver.get(match_url)
-    time.sleep(5)
+        wait_ready(driver, timeout=25)
+        time.sleep(2)
 
-    script_el = driver.find_element(By.XPATH, '//*[@id="layout-wrapper"]/script[1]')
-    script = script_el.get_attribute('innerHTML').strip().replace('\\n', '').replace('\\t', '')
+    try:
+        data = extract_whoscored_json_from_scripts(driver)
+    except Exception as e:
+        # Fallback: zkusíme HTML zdroj (někdy Selenium nevidí innerHTML)
+        page = driver.page_source
+        # zkusíme jednodušší heuristiku – vyndat největší JSON blok s "events"
+        best = ""
+        if "events" in page and "matchId" in page:
+            # oříznem stranu do ~500k znaků kolem "events"
+            idx = page.find("events")
+            start = max(0, idx - 200000)
+            end = min(len(page), idx + 200000)
+            snippet = page[start:end]
+            # opět párování závorek
+            opens = [i for i, ch in enumerate(snippet) if ch == "{"]
+            n = len(snippet)
+            for st in opens:
+                depth = 0
+                for en in range(st, n):
+                    ch = snippet[en]
+                    if ch == "{":
+                        depth += 1
+                    elif ch == "}":
+                        depth -= 1
+                        if depth == 0:
+                            cand = snippet[st:en+1]
+                            if '"events"' in cand and '"matchId"' in cand and len(cand) > len(best):
+                                best = cand
+                            break
+            if best:
+                try:
+                    data = json.loads(best)
+                except Exception as e2:
+                    driver.quit()
+                    raise RuntimeError(f"Nepodařilo se rozparsovat JSON z page_source: {e2}") from e2
+            else:
+                driver.quit()
+                raise RuntimeError(f"JSON nenalezen (fallback). Původní chyba: {e}")
+        else:
+            driver.quit()
+            raise RuntimeError(f"JSON nenalezen ve skriptech ani v page_source. Původní chyba: {e}")
 
-    script = script[script.index("matchId"):script.rindex("}")]
-    parts = list(filter(None, script.split(',            ')))
-    metadata = json.loads(parts[1][parts[1].index('{'):])  # první JSON objekt
-    keys = [p.split(':')[0].strip() for p in parts]
-    values = [p.split(':', 1)[1].strip() for p in parts]
-    for k, v in zip(keys, values):
-        if k not in metadata:
-            try:
-                metadata[k] = json.loads(v)
-            except Exception:
-                pass
-
-    data = dict(OrderedDict(sorted(metadata.items())))
-
-    # Doplnění kontextu (nepovinné)
+    # Doplňkové info
     try:
         region = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/span[1]').text
     except NoSuchElementException:
@@ -133,7 +212,6 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
     except Exception:
         df["cardType"] = False
 
-    # Jména / týmy
     df["playerId"] = df.get("playerId", pd.Series(index=df.index)).fillna(-1).astype(int).astype(str)
     id_name_map = data.get("playerIdNameDictionary", {})
     df["playerName"] = df["playerId"].map(id_name_map)
@@ -147,11 +225,7 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
     }
     df["squadName"] = df["teamId"].map(team_id_to_name)
 
-    # =========================
-    # Pomocné flagy (bez převodu souřadnic, přímo v WS 0..100)
-    # final third = x > 66.7 (poslední třetina)
-    # penalta (útočná) ~ endX >= 84.3 a |endY-50| <= 29.65
-    # =========================
+    # Flagy v 0..100 prostoru
     df["final_third_start"] = (df["x"] <= 66.7).astype(int)
     df["final_third_end"] = (df["endX"] > 66.7).astype(int)
 
@@ -161,9 +235,6 @@ def get_events_df_from_url_with_qualifiers(match_url: str) -> (pd.DataFrame, dic
     return df, data
 
 
-# =========================
-# Vizualizace – Entries do poslední třetiny
-# =========================
 def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
     pitch = VerticalPitch(pitch_type="custom", pitch_length=100, pitch_width=100,
                           pitch_color="w",
@@ -183,7 +254,6 @@ def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
     pitch.scatter(sub["endX"], sub["endY"], zorder=3,
                   s=40, edgecolors="#000000", marker="o", ax=ax)
 
-    # Zóny finální třetiny
     def zone_from_y(y):
         if 0 <= y <= 20:
             return "Zone 1"
@@ -238,9 +308,6 @@ def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
     ax.axhline(y=66.7, c=textcolor, ls="-", lw=3, alpha=0.3, zorder=5)
 
 
-# =========================
-# Vizualizace – Vstupy do vápna + heatmapa startů
-# =========================
 def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
     pitch = VerticalPitch(pitch_type="custom", pitch_length=100, pitch_width=100,
                           pitch_color=facecolor,
@@ -276,7 +343,7 @@ def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
 # =========================
 # Streamlit UI
 # =========================
-st.set_page_config(page_title="WhoScored → Entries Viz (Chromium, bez převodu)", layout="wide")
+st.set_page_config(page_title="WhoScored → Entries Viz (Chromium, robustní parser)", layout="wide")
 st.title("Vstupy do F3 a do vápna – WhoScored scraper → vizualizace (Chromium, bez převodu souřadnic)")
 
 default_url = "https://1xbet.whoscored.com/matches/1874065/live/international-world-cup-qualification-uefa-2025-2026-montenegro-czechia"
@@ -286,7 +353,7 @@ col_go, col_info = st.columns([1, 3])
 with col_go:
     go = st.button("Načíst a vykreslit", type="primary")
 with col_info:
-    st.caption("Očekává se, že prostředí má nainstalováno 'chromium' a 'chromium-driver' (viz packages.txt).")
+    st.caption("Appka prochází všechny <script> tagy a robustně hledá JSON ('events', 'matchId'). Očekává 'chromium' a 'chromium-driver'.")
 
 if go and match_url:
     with st.spinner("Stahuji a zpracovávám data…"):
