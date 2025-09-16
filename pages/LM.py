@@ -1,6 +1,15 @@
+# Streamlit aplikace (Chromium, bez převodu souřadnic)
+
+Níže jsou tři soubory: `app.py`, `requirements.txt` a `packages.txt`. Nahraj je do GitHub repozitáře (root) a ve Streamlit Cloud nastav entrypoint na `app.py`.
+
+---
+
+## app.py
+
+```python
+import os
 import time
 import json
-import base64
 import shutil
 import numpy as np
 import pandas as pd
@@ -9,9 +18,7 @@ import streamlit as st
 from collections import OrderedDict
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import WebDriverException, NoSuchElementException, TimeoutException
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
 
@@ -23,6 +30,7 @@ from mplsoccer import VerticalPitch
 # =========================
 # Selenium (Chromium) setup
 # =========================
+
 def make_driver():
     chrome_options = ChromeOptions()
     chrome_options.add_argument("--headless=new")
@@ -30,261 +38,153 @@ def make_driver():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
-    # allow perf logging
-    chrome_prefs = {"download.default_directory": "/tmp"}
-    chrome_options.experimental_options["prefs"] = chrome_prefs
-    chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
-    # Prefer common Chromium paths
-    for binary in ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]:
-        if shutil.which(binary):
-            chrome_options.binary_location = binary
+    # Nastavení cesty k binárce pro různá prostředí
+    for bin_path in ("/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"):
+        if os.path.exists(bin_path):
+            chrome_options.binary_location = bin_path
             break
 
-    chromedriver_path = shutil.which("chromedriver") or shutil.which("chromium-driver") or "chromedriver"
+    # chromedriver z PATH (Streamlit Cloud: balík chromium-driver)
+    chromedriver_path = shutil.which("chromedriver") or "/usr/bin/chromedriver"
     service = ChromeService(executable_path=chromedriver_path)
+
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
 
-def wait_ready(driver, timeout=25):
-    WebDriverWait(driver, timeout).until(
-        lambda d: d.execute_script("return document.readyState") == "complete"
-    )
-
-
 # =========================
-# Robust data extraction
+# Stažení a rozparsování dat (bez převodu souřadnic, WS 0–100)
 # =========================
-def extract_json_from_scripts(driver):
-    """Scan all <script> tags for a big JSON blob containing 'events' and 'matchId'."""
-    scripts = driver.find_elements(By.TAG_NAME, "script")
-    for s in scripts:
-        try:
-            txt = s.get_attribute("innerHTML") or ""
-        except Exception:
-            continue
-        if ("events" not in txt) or ("matchId" not in txt):
-            continue
-        # Brace-matching to carve a JSON object
-        n = len(txt)
-        for i, ch in enumerate(txt):
-            if ch != "{":
-                continue
-            depth = 0
-            for j in range(i, n):
-                if txt[j] == "{":
-                    depth += 1
-                elif txt[j] == "}":
-                    depth -= 1
-                    if depth == 0:
-                        cand = txt[i:j+1]
-                        if '"events"' in cand and '"matchId"' in cand:
-                            try:
-                                return json.loads(cand)
-                            except Exception:
-                                pass
-                        break
-    raise ValueError("JSON ve <script> nenalezen")
 
-
-def extract_json_from_network(driver, collect_seconds=6):
-    """Use Chrome DevTools Protocol via Selenium to capture XHR/fetch JSON bodies."""
-    # Enable Network
-    driver.execute_cdp_cmd("Network.enable", {})
-    start = time.time()
-    seen_request_ids = set()
-    candidates = []
-
-    while time.time() - start < collect_seconds:
-        logs = driver.get_log("performance")
-        for entry in logs:
-            try:
-                msg = json.loads(entry["message"])["message"]
-            except Exception:
-                continue
-            method = msg.get("method", "")
-            params = msg.get("params", {})
-
-            if method == "Network.responseReceived":
-                resp = params.get("response", {})
-                url = resp.get("url", "")
-                mime = resp.get("mimeType", "")
-                req_id = params.get("requestId")
-                if not req_id or req_id in seen_request_ids:
-                    continue
-                # Filter to JSON-ish responses from whoscored endpoints
-                if ("whoscored" in url.lower()) and ("json" in mime or "javascript" in mime or "text/plain" in mime):
-                    seen_request_ids.add(req_id)
-                    candidates.append((req_id, url, mime))
-
-        time.sleep(0.3)
-
-    # Try to fetch bodies
-    for req_id, url, mime in candidates:
-        try:
-            body_res = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": req_id})
-            body = body_res.get("body", "")
-            if body_res.get("base64Encoded"):
-                body = base64.b64decode(body).decode("utf-8", errors="ignore")
-            # Some endpoints return JSON as text/plain
-            # Try JSON parse directly; if fails, try to locate a JSON object with 'events'
-            try:
-                obj = json.loads(body)
-                if isinstance(obj, dict) and "events" in obj and "matchId" in obj:
-                    return obj
-                # Sometimes nested under e.g. obj['matchCentreData']
-                for k, v in obj.items() if isinstance(obj, dict) else []:
-                    if isinstance(v, dict) and "events" in v and "matchId" in v:
-                        return v
-            except Exception:
-                # Fallback: scan for the largest JSON object containing 'events'
-                best = ""
-                for idx in [i for i, ch in enumerate(body) if ch == "{"]:
-                    depth = 0
-                    for j in range(idx, len(body)):
-                        c = body[j]
-                        if c == "{":
-                            depth += 1
-                        elif c == "}":
-                            depth -= 1
-                            if depth == 0:
-                                cand = body[idx:j+1]
-                                if '"events"' in cand and '"matchId"' in cand and len(cand) > len(best):
-                                    best = cand
-                                break
-                if best:
-                    try:
-                        return json.loads(best)
-                    except Exception:
-                        pass
-        except Exception:
-            continue
-
-    raise RuntimeError("Network log pro JSON s událostmi nenašel vhodné tělo odpovědi.")
-
-
-def get_events_json(match_url: str):
+def get_events_df_from_url_with_qualifiers(match_url: str) -> pd.DataFrame:
     driver = make_driver()
+
     try:
-        # Enable Network before navigation to capture early XHRs
-        driver.execute_cdp_cmd("Network.enable", {})
-        driver.get(match_url)
-        wait_ready(driver, 25)
-        time.sleep(2)
-
-        # 1) Try inline scripts
         try:
-            data = extract_json_from_scripts(driver)
-        except Exception:
-            # 2) Try network capture
-            data = extract_json_from_network(driver, collect_seconds=8)
+            driver.get(match_url)
+        except WebDriverException:
+            driver.get(match_url)
+        time.sleep(5)
 
-        # Supplementary info
+        # Stejný přístup jako tvůj: první inline <script> pod #layout-wrapper
+        script = driver.find_element(By.XPATH, '//*[@id="layout-wrapper"]/script[1]').get_attribute('innerHTML')
+        script = script.strip().replace('\n', '').replace('\t', '')
+        script = script[script.index("matchId"):script.rindex("}")]
+        parts = list(filter(None, script.split(',            ')))
+        metadata = json.loads(parts[1][parts[1].index('{'):])
+        keys = [p.split(':')[0].strip() for p in parts]
+        values = [p.split(':', 1)[1].strip() for p in parts]
+        for k, v in zip(keys, values):
+            if k not in metadata:
+                try:
+                    metadata[k] = json.loads(v)
+                except Exception:
+                    pass
+
+        data = dict(OrderedDict(sorted(metadata.items())))
+
+        # Info z breadcrumbs (nepovinné, ale užitečné)
         try:
             region = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/span[1]').text
-        except NoSuchElementException:
+        except Exception:
             region = ""
         try:
-            league_season = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/a').text
-            if " - " in league_season:
-                league, season = league_season.split(" - ", 1)
-            else:
-                league, season = league_season, ""
-        except NoSuchElementException:
+            ls = driver.find_element(By.XPATH, '//*[@id="breadcrumb-nav"]/a').text
+            league = ls.split(' - ')[0] if ' - ' in ls else ls
+            season = ls.split(' - ')[1] if ' - ' in ls else ""
+        except Exception:
             league, season = "", ""
+
+        home_team = data['home']['name']
+        away_team = data['away']['name']
+        score = data.get('score', '')
+        date = (data.get('startDate') or '')[:10]
+
+        print(f"📥 Stahuji zápas: {home_team} vs {away_team} ({score})")
+        print(f"📆 Datum: {date} | Liga: {league} ({season}) | Region: {region}")
+
+        # DataFrame
+        events = data['events']
+        for e in events:
+            e.update({
+                'matchId': data['matchId'],
+                'startDate': data.get('startDate'),
+                'startTime': data.get('startTime'),
+                'score': data.get('score'),
+                'ftScore': data.get('ftScore'),
+                'htScore': data.get('htScore'),
+                'etScore': data.get('etScore'),
+                'venueName': data.get('venueName'),
+                'maxMinute': data.get('maxMinute')
+            })
+
+        events_df = pd.DataFrame(events)
+        if events_df.empty:
+            return events_df
+
+        # Zploštění
+        if 'period' in events_df:
+            events_df['period'] = pd.json_normalize(events_df['period'])['displayName']
+        if 'type' in events_df:
+            events_df['type'] = pd.json_normalize(events_df['type'])['displayName']
+        if 'outcomeType' in events_df:
+            events_df['outcomeType'] = pd.json_normalize(events_df['outcomeType'])['displayName']
+
+        try:
+            x = events_df['cardType'].fillna({i: {} for i in events_df.index})
+            events_df['cardType'] = pd.json_normalize(x)['displayName'].fillna(False)
+        except Exception:
+            events_df['cardType'] = False
+
+        # Hráči / týmy
+        if 'playerId' in events_df:
+            events_df['playerId'] = events_df['playerId'].fillna(-1).astype(int).astype(str)
+            events_df['playerName'] = events_df['playerId'].map(data.get('playerIdNameDictionary', {}))
+        events_df['h_a'] = events_df['teamId'].map({data['home']['teamId']: 'h', data['away']['teamId']: 'a'})
+        events_df['squadName'] = events_df['teamId'].map({
+            data['home']['teamId']: data['home']['name'],
+            data['away']['teamId']: data['away']['name'],
+        })
+
+        # Rozbalení qualifiers
+        def parse_qualifiers(qual_list):
+            if not isinstance(qual_list, list):
+                return {}
+            return {q["type"]["displayName"]: q.get("value", True) for q in qual_list}
+        if 'qualifiers' in events_df:
+            qualifiers_df = pd.json_normalize(events_df['qualifiers'].apply(parse_qualifiers))
+            events_df = pd.concat([events_df.drop(columns=['qualifiers']), qualifiers_df], axis=1)
+
+        # --- Odvozené sloupce pro filtry (bez převodu souřadnic, WS 0–100) ---
+        # SUCCESS/FAIL
+        if 'outcomeType' in events_df:
+            events_df['result'] = np.where(events_df['outcomeType'].str.lower() == 'successful',
+                                           'SUCCESS',
+                                           np.where(events_df['outcomeType'].isna(), np.nan, 'FAIL'))
+        else:
+            events_df['result'] = np.nan
+
+        # Final third (poslední třetina hřiště): x z <= 66.7 do > 66.7
+        events_df['final_third_start'] = (events_df['x'] <= 66.7).astype(int) if 'x' in events_df else 0
+        events_df['final_third_end'] = (events_df['endX'] > 66.7).astype(int) if 'endX' in events_df else 0
+
+        # Penalta – na útočné straně: ~ endX >= 84.3 a |endY - 50| <= 29.65
+        events_df['penaltyBox'] = ((events_df['x'] >= 84.3) & (np.abs(events_df['y'] - 50) <= 29.65)).astype(int) \
+                                   if {'x','y'}.issubset(events_df.columns) else 0
+        events_df['penaltyBox_end'] = ((events_df['endX'] >= 84.3) & (np.abs(events_df['endY'] - 50) <= 29.65)).astype(int) \
+                                       if {'endX','endY'}.issubset(events_df.columns) else 0
+
+        return events_df
 
     finally:
         driver.quit()
 
-    return data, {"region": region, "league": league, "season": season}
-
 
 # =========================
-# Parse → DataFrame (no coordinate conversion, use WS 0..100)
+# Vizualizace
 # =========================
-def to_events_df(data: dict, extra_meta: dict) -> (pd.DataFrame, dict):
-    events = data.get("events", [])
-    home = data.get("home", {}) or data.get("homeTeam", {})
-    away = data.get("away", {}) or data.get("awayTeam", {})
 
-    for e in events:
-        e.update({
-            "matchId": data.get("matchId"),
-            "startDate": data.get("startDate"),
-            "startTime": data.get("startTime"),
-            "score": data.get("score"),
-            "ftScore": data.get("ftScore"),
-            "htScore": data.get("htScore"),
-            "etScore": data.get("etScore"),
-            "venueName": data.get("venueName"),
-            "maxMinute": data.get("maxMinute"),
-            "region": extra_meta.get("region", ""),
-            "league": extra_meta.get("league", ""),
-            "season": extra_meta.get("season", ""),
-        })
-
-    df = pd.DataFrame(events)
-    meta = {
-        "home": home,
-        "away": away,
-        "matchId": data.get("matchId"),
-        "startDate": data.get("startDate"),
-        "score": data.get("score"),
-        "league": extra_meta.get("league", ""),
-        "season": extra_meta.get("season", ""),
-    }
-
-    if df.empty:
-        return df, meta
-
-    # Flatten
-    if "period" in df:
-        df["period"] = pd.json_normalize(df["period"])["displayName"]
-    if "type" in df:
-        df["actionType"] = pd.json_normalize(df["type"])["displayName"]
-    else:
-        df["actionType"] = np.nan
-    if "outcomeType" in df:
-        df["outcomeType"] = pd.json_normalize(df["outcomeType"])["displayName"]
-    else:
-        df["outcomeType"] = np.nan
-
-    df["result"] = np.where(df["outcomeType"].str.lower().eq("successful"), "SUCCESS",
-                            np.where(df["outcomeType"].isna(), np.nan, "FAIL"))
-
-    try:
-        x = df["cardType"].fillna({i: {} for i in df.index})
-        df["cardType"] = pd.json_normalize(x)["displayName"].fillna(False)
-    except Exception:
-        df["cardType"] = False
-
-    # Names / teams
-    df["playerId"] = df.get("playerId", pd.Series(index=df.index)).fillna(-1).astype(int).astype(str)
-    id_name_map = data.get("playerIdNameDictionary", {})
-    df["playerName"] = df["playerId"].map(id_name_map)
-
-    home_tid = home.get("teamId")
-    away_tid = away.get("teamId")
-    df["h_a"] = df["teamId"].map({home_tid: "h", away_tid: "a"})
-    team_id_to_name = {
-        home_tid: home.get("name"),
-        away_tid: away.get("name"),
-    }
-    df["squadName"] = df["teamId"].map(team_id_to_name)
-
-    # Flags in 0..100 space
-    df["final_third_start"] = (df["x"] <= 66.7).astype(int)
-    df["final_third_end"] = (df["endX"] > 66.7).astype(int)
-    df["penaltyBox"] = ((df["x"] >= 84.3) & (np.abs(df["y"] - 50) <= 29.65)).astype(int)
-    df["penaltyBox_end"] = ((df["endX"] >= 84.3) & (np.abs(df["endY"] - 50) <= 29.65)).astype(int)
-
-    return df, meta
-
-
-# =========================
-# Vizualizace (stejné jako dříve)
-# =========================
 def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
     pitch = VerticalPitch(pitch_type="custom", pitch_length=100, pitch_width=100,
                           pitch_color="w",
@@ -293,10 +193,14 @@ def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
     ax.set_facecolor(facecolor)
 
     mask = (
-        df_team["actionType"].isin(["Pass", "Dribble"])) & \
+        df_team["type"].isin(["Pass", "Dribble"])) & \
         (df_team["result"] == "SUCCESS") & \
         (df_team["x"] <= 66.7) & (df_team["endX"] > 66.7)
     sub = df_team.loc[mask].copy()
+
+    if sub.empty:
+        ax.text(50, 50, "Žádné vstupy do finální třetiny", ha="center", va="center", color=textcolor)
+        return
 
     pitch.lines(sub["x"], sub["y"],
                 sub["endX"], sub["endY"],
@@ -304,6 +208,7 @@ def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
     pitch.scatter(sub["endX"], sub["endY"], zorder=3,
                   s=40, edgecolors="#000000", marker="o", ax=ax)
 
+    # Zóny 1–5 podle Y (0–20, 20–40, ..., 80–100)
     def zone_from_y(y):
         if 0 <= y <= 20:
             return "Zone 1"
@@ -319,8 +224,12 @@ def plot_final_third_entries(ax, df_team, facecolor="#161B2E", textcolor="w"):
 
     sub = sub[sub["endX"] > 66.7].copy()
     sub["Fifth"] = sub["endY"].apply(zone_from_y)
+    # gpa z PXT_PASS pokud existuje
+    if "PXT_PASS" not in sub.columns:
+        sub["PXT_PASS"] = np.nan
+
     fifth = sub.groupby("Fifth", dropna=True).agg(
-        counts=("actionType", "count"),
+        counts=("type", "count"),
         gpa=("PXT_PASS", "mean")
     ).reset_index()
 
@@ -367,10 +276,14 @@ def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
     ax.set_facecolor(facecolor)
 
     mask = (
-        df_team["actionType"].isin(["Pass", "Dribble"])) & \
+        df_team["type"].isin(["Pass", "Dribble"])) & \
         (df_team["result"] == "SUCCESS") & \
         (df_team["penaltyBox"] != 1) & (df_team["penaltyBox_end"] == 1)
     sub = df_team.loc[mask].copy()
+
+    if sub.empty:
+        ax.text(50, 50, "Žádné vstupy do vápna", ha="center", va="center", color=textcolor)
+        return
 
     pitch.lines(sub["x"], sub["y"],
                 sub["endX"], sub["endY"],
@@ -378,6 +291,7 @@ def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
     pitch.scatter(sub["endX"], sub["endY"], zorder=3,
                   s=70, edgecolors="#000000", marker="o", ax=ax)
 
+    # Heatmapa startů jen na soupeřově polovině (x >= 50)
     filt = sub[sub["x"] >= 50]
     if not filt.empty:
         bin_stat = pitch.bin_statistic_positional(
@@ -393,23 +307,23 @@ def plot_box_entries_heatmap(ax, df_team, facecolor="#161B2E", textcolor="w"):
 # =========================
 # Streamlit UI
 # =========================
-st.set_page_config(page_title="WhoScored → Entries Viz (Chromium + CDP)", layout="wide")
+
+st.set_page_config(page_title="WhoScored → Entries Viz (Chromium, bez převodu)", layout="wide")
 st.title("Vstupy do F3 a do vápna – WhoScored scraper → vizualizace (Chromium, bez převodu souřadnic)")
 
 default_url = "https://1xbet.whoscored.com/matches/1874065/live/international-world-cup-qualification-uefa-2025-2026-montenegro-czechia"
 match_url = st.text_input("Vlož URL zápasu z 1xbet.whoscored.com", value=default_url)
 
-col_go, col_dbg = st.columns([1, 3])
+col_go, col_info = st.columns([1, 3])
 with col_go:
     go = st.button("Načíst a vykreslit", type="primary")
-with col_dbg:
-    st.caption("Appka nejprve zkouší inline skripty, když selžou, chytá JSON přes Chrome DevTools (Network).")
+with col_info:
+    st.caption("Appka používá Chromium + chromedriver a **nepřevádí** souřadnice (pracuje s WS 0–100). Pokud běžíš ve Streamlit Cloud, přidej `packages.txt` s `chromium` a `chromium-driver`.")
 
 if go and match_url:
     with st.spinner("Stahuji a zpracovávám data…"):
         try:
-            raw_data, extra = get_events_json(match_url)
-            events_df, meta = to_events_df(raw_data, extra)
+            events_df = get_events_df_from_url_with_qualifiers(match_url)
         except Exception as e:
             st.error(f"Chyba při načítání: {e}")
             st.stop()
@@ -418,14 +332,22 @@ if go and match_url:
         st.warning("Pro tento zápas se nepodařilo načíst žádné události.")
         st.stop()
 
-    home = meta.get("home", {}).get("name", "Home")
-    away = meta.get("away", {}).get("name", "Away")
-    home_tid = meta.get("home", {}).get("teamId")
-    away_tid = meta.get("away", {}).get("teamId")
+    # Meta
+    try:
+        home_tid = int(events_df.loc[events_df['h_a'] == 'h', 'teamId'].iloc[0])
+        away_tid = int(events_df.loc[events_df['h_a'] == 'a', 'teamId'].iloc[0])
+        home = events_df.loc[events_df['teamId'] == home_tid, 'squadName'].iloc[0]
+        away = events_df.loc[events_df['teamId'] == away_tid, 'squadName'].iloc[0]
+    except Exception:
+        # fallback
+        home = 'Home'
+        away = 'Away'
+        home_tid = events_df['teamId'].unique()[0]
+        away_tid = events_df['teamId'].unique()[1] if len(events_df['teamId'].unique()) > 1 else home_tid
 
     st.subheader(f"{home} vs {away}")
-    st.caption(f"Datum: {meta.get('startDate','')[:10]} | Skóre: {meta.get('score','')} | Liga: {meta.get('league','')} {meta.get('season','')}")
 
+    # Vlevo preferuj teamId 349, jinak domácí
     preferred_left_tid = 349
     if preferred_left_tid in (home_tid, away_tid):
         left_tid = preferred_left_tid
@@ -464,11 +386,11 @@ if go and match_url:
         plot_box_entries_heatmap(ax4, right_df)
         st.pyplot(fig4, clear_figure=True)
 
+    # Export CSV
     csv_bytes = events_df.to_csv(index=False).encode("utf-8")
     st.download_button("Stáhnout events.csv", data=csv_bytes, file_name="events.csv", mime="text/csv")
-
-    # Debug download raw JSON
-    st.download_button("Stáhnout raw JSON", data=json.dumps(raw_data, ensure_ascii=False, indent=2),
-                       file_name="whoscored_raw.json", mime="application/json")
 else:
     st.info("Zadej URL a klikni na **Načíst a vykreslit**.")
+```
+
+
